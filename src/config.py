@@ -14,7 +14,7 @@ REPORTS = ROOT / "reports"
 for _p in (DATA_RAW, DATA_INTERIM, DATA_PROCESSED, REPORTS):
     _p.mkdir(parents=True, exist_ok=True)
 
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", f"file://{ROOT / 'mlruns'}")
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", (ROOT / "mlruns").as_uri())
 
 
 def load_params(section: str | None = None) -> dict:
