@@ -1,0 +1,45 @@
+# Pipeline de donnees reproductible.
+# `dvc repro` reexecute uniquement les etapes dont les dependances ont change.
+
+stages:
+
+  extract:
+    cmd: python -m src.data.extract
+    deps:
+      - src/data/extract.py
+      - data/raw
+    outs:
+      - data/interim/documents.jsonl
+
+  prepare:
+    cmd: python -m src.data.prepare
+    deps:
+      - src/data/prepare.py
+      - data/interim/documents.jsonl
+    params:
+      - prepare
+    outs:
+      - data/processed/clauses_train.jsonl
+      - data/processed/clauses_test.jsonl
+
+  classify_baseline:
+    cmd: python -m src.models.classify_baseline
+    deps:
+      - src/models/classify_baseline.py
+      - data/processed/clauses_train.jsonl
+      - data/processed/clauses_test.jsonl
+    params:
+      - classify_baseline
+    metrics:
+      - reports/metrics_baseline.json:
+          cache: false
+
+  build_index:
+    cmd: python -m src.retrieval.build_index
+    deps:
+      - src/retrieval/build_index.py
+      - data/raw/reglementation
+    params:
+      - retrieval
+    outs:
+      - data/processed/index

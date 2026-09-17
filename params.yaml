@@ -1,0 +1,34 @@
+# Hyperparametres centralises.
+# Toute modification ici declenche la re-execution des etapes DVC concernees.
+
+prepare:
+  min_clause_chars: 40        # en dessous, le segment est ignore
+  max_clause_chars: 2000      # au dela, le segment est redecoupe
+  test_size: 0.2
+  random_state: 42
+
+classify_baseline:
+  vectorizer: tfidf
+  ngram_max: 2
+  max_features: 50000
+  C: 1.0
+
+classify_bert:
+  model_name: distilbert-base-uncased
+  epochs: 3
+  batch_size: 16
+  learning_rate: 2.0e-5
+  max_length: 256
+
+retrieval:
+  top_k: 5
+  dense_model: intfloat/e5-base-v2
+  reranker: cross-encoder/ms-marco-MiniLM-L-6-v2
+  hybrid_alpha: 0.5           # poids du dense vs BM25
+
+judge:
+  model_name: Qwen/Qwen2.5-1.5B-Instruct
+  load_in_4bit: true
+  max_new_tokens: 256
+  temperature: 0.1
+  confidence_threshold: 0.6   # en dessous, le systeme s'abstient

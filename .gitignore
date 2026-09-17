@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Donnees (gerees par DVC)
+/data/raw
+/data/interim
+/data/processed
+*.pdf
+*.zip
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# DVC
+/.dvc/cache
+/.dvc/tmp
+
+# Environnement
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
+
+# Notebooks
+.ipynb_checkpoints/
