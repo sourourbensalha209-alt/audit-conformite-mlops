@@ -3,19 +3,11 @@
 
 stages:
 
-  extract:
-    cmd: python -m src.data.extract
-    deps:
-      - src/data/extract.py
-      - data/raw
-    outs:
-      - data/interim/documents.jsonl
-
   prepare:
     cmd: python -m src.data.prepare
     deps:
       - src/data/prepare.py
-      - data/interim/documents.jsonl
+      - data/raw/cuad
     params:
       - prepare
     outs:
@@ -43,3 +35,7 @@ stages:
       - retrieval
     outs:
       - data/processed/index
+
+# Etape reservee aux documents PDF reels (ingestion + OCR).
+# Elle sera reintegree au pipeline a l'etape 4 du projet, quand le corpus
+# de contrats scannes sera constitue. Le code vit dans src/data/extract.py.
