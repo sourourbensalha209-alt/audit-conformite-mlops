@@ -1,75 +1,159 @@
 # Agent d'audit de conformité documentaire
 
-Service automatisé qui analyse un contrat ou une politique de confidentialité et produit
-un rapport d'audit clause par clause, avec verdict, justification et citation de
-l'article réglementaire applicable.
+Système qui analyse un contrat et produit un rapport d'audit clause par clause :
+pour chaque clause, un verdict (conforme, non conforme, à vérifier, manquante),
+une justification et la citation de l'article de loi applicable.
 
-**Module Projet — 5ème année Ingénierie Data Science & IA**
-
----
-
-## Membres et rôles
-
-| Membre | Rôle | Périmètre |
-| --- | --- | --- |
-| À compléter | Data Engineer | Ingestion, OCR, découpage, Spark, DVC |
-| À compléter | ML Engineer | Classification, retrieval, jugement, MLflow |
-| À compléter | MLOps Engineer | Kubeflow, Docker, FastAPI, monitoring |
+**Projet Big Data & Deep Learning — 5ème année Ingénierie Data Science & IA**
 
 ---
 
-## Architecture
+## Le problème
+
+La vérification de conformité d'un contrat est aujourd'hui faite à la main par un
+juriste, clause par clause : environ 3 heures pour un contrat de 40 pages. Le
+travail est coûteux, difficile à tracer, et les clauses manquantes sont faciles
+à rater. Ce projet automatise cette vérification.
+
+---
+
+## Architecture cible
 
 ```
-Document PDF/DOCX
+Contrat PDF / DOCX
       |
       v
-[1] OCR + detection de mise en page
+[1] Extraction du texte (OCR si le document est scanné)
       |
       v
-[2] Decoupage en clauses
+[2] Découpage en clauses
       |
       v
-[3] Classification du type de clause
+[3] Classification du type de clause          <-- terminé (Legal-BERT, F1 macro 0.719)
       |
       v
-[4] Retrieval hybride dans le corpus reglementaire
+[4] Recherche de l'article de loi (RAG)
       |
       v
-[5] Jugement de conformite (SLM)
+[5] Jugement de conformité (LLM)
       |
       v
-[6] Scoring + rapport
+[6] Rapport d'audit
       |
       v
-[7] API FastAPI + monitoring
+[7] API + interface web + monitoring
       |
       v
-   Feedback juriste --> reentrainement
+   Correction par un juriste --> réentraînement
 ```
+
+Couche Big Data prévue : ingestion en flux (Kafka), traitement distribué (Spark),
+stockage en data lake.
+
+---
+
+## Données
+
+**CUAD** (Contract Understanding Atticus Dataset) : 510 contrats commerciaux
+réels, annotés par des juristes sur 41 catégories de clauses.
+
+| Étape | Volume |
+| --- | --- |
+| Corpus brut (v1, versionné DVC) | 1,7 Go |
+| Clauses étiquetées (v2) | 10 134 clauses, 41 catégories |
+| Entraînement / test | 8 222 / 1 912 clauses |
+
+Le jeu est déséquilibré : les catégories fréquentes dépassent 500 exemples,
+les plus rares en ont moins de 20. C'est ce qui explique le choix du **F1 macro**
+comme métrique principale : il donne le même poids à chaque catégorie, rare ou
+fréquente.
+
+---
+
+## Résultats : classification des clauses
+
+Sept modèles comparés sur le même jeu de test, tous tracés dans MLflow
+(expérience `01-classification-clauses`).
+
+| Modèle | Itération | F1 macro | Accuracy | F1 pondéré |
+| --- | --- | --- | --- | --- |
+| **Legal-BERT (pondéré)** | 2 | **0,719** | **0,792** | **0,793** |
+| TF-IDF + SVM (baseline) | — | 0,670 | 0,750 | 0,740 |
+| DeBERTa-v3-small (pondéré) | 2 | 0,667 | 0,746 | 0,741 |
+| Legal-BERT | 1 | 0,595 | 0,768 | 0,740 |
+| BERT-base | 1 | 0,544 | 0,732 | 0,699 |
+| DistilBERT | 1 | 0,527 | 0,724 | 0,693 |
+| DeBERTa-v3-small | 1 | 0,479 | 0,693 | 0,657 |
+
+![Comparaison des modèles](reports/benchmark_v2_f1.png)
+
+### Ce que montrent ces résultats
+
+**Itération 1 : la baseline résiste.** Entraînés 3 époques avec une perte
+standard, les Transformers sont bons sur les catégories fréquentes (Legal-BERT a
+la meilleure accuracy, 0,768) mais ratent les catégories rares, ce qui fait
+chuter leur F1 macro sous celui de la baseline.
+
+**Le pré-entraînement juridique compte.** Legal-BERT et BERT-base ont la même
+architecture et la même taille (110 M de paramètres). Seule différence :
+Legal-BERT a été pré-entraîné sur des textes juridiques. Écart : +5 points de
+F1 macro.
+
+**Itération 2 : la baseline est battue.** Trois changements ciblent les
+catégories rares :
+
+- perte pondérée par l'inverse de la fréquence des classes (racine carrée) ;
+- jusqu'à 10 époques avec arrêt automatique après 2 époques sans progrès ;
+- sélection de la meilleure époque sur un jeu de validation séparé (10 % du
+  train), le jeu de test n'étant utilisé qu'une fois, pour la note finale.
+
+Résultat : Legal-BERT passe de 0,595 à **0,719** de F1 macro (+12 points) et
+dépasse la baseline sur toutes les métriques. Sur les catégories rares seules
+(moins de 100 exemples), il atteint 0,638.
+
+**Modèle retenu pour le pipeline : Legal-BERT, itération 2.** Il est versionné
+avec DVC dans `models/best_model_v2`.
+
+### Reproduire
+
+- Baseline : `python -m src.models.classify_baseline`
+- Itération 1 : `notebooks/benchmark_transformers_colab_v2.ipynb` (Google Colab, GPU T4)
+- Itération 2 : `notebooks/iteration2_colab.ipynb` (Google Colab, GPU T4)
+- Import des résultats Colab dans MLflow : `python -m src.models.log_benchmark reports/benchmark_v2.json`
+
+---
+
+## Stack technique
+
+| Outil | Usage dans le projet |
+| --- | --- |
+| GitHub | Versionnement du code, historique des contributions |
+| DVC | Versionnement des données et des modèles |
+| MLflow | Suivi des expériences, comparaison des modèles |
+| Hugging Face Transformers | Fine-tuning de BERT, Legal-BERT, DeBERTa |
+| Google Colab (GPU T4) | Entraînement des Transformers |
+| scikit-learn | Baseline TF-IDF + SVM, métriques |
+| FastAPI, Docker | Service d'audit (en cours) |
 
 ---
 
 ## Démarrage rapide
 
-```bash
-# 1. Environnement
-python -m venv .venv && source .venv/bin/activate
+```powershell
+# Environnement (Windows)
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-# 2. Données
-python -m src.data.download          # télécharge CUAD + le corpus RGPD
-dvc add data/raw                     # versionne le corpus brut
-git add data/raw.dvc .gitignore && git commit -m "data(raw): corpus v1"
+# Données
+python -m src.data.download
+python -m src.data.prepare
 
-# 3. Pipeline
-dvc repro                            # exécute toutes les étapes déclarées
+# Baseline
+python -m src.models.classify_baseline
 
-# 4. Suivi des expériences
-mlflow ui --port 5000                # http://localhost:5000
-
-# 5. API
-uvicorn src.api.main:app --reload    # http://localhost:8000/docs
+# Suivi des expériences
+mlflow ui --port 5000          # http://localhost:5000
 ```
 
 ---
@@ -78,29 +162,45 @@ uvicorn src.api.main:app --reload    # http://localhost:8000/docs
 
 ```
 .
-├── data/                  # données (non versionnées par git, gérées par DVC)
-│   ├── raw/               # v1 : corpus brut
-│   ├── interim/           # v2 : texte extrait et nettoyé
-│   └── processed/         # v3 : clauses découpées et augmentées
+├── data/            # données, gérées par DVC (non versionnées par Git)
+├── models/          # modèles entraînés, gérés par DVC
+├── notebooks/       # notebooks d'entraînement Colab
+├── reports/         # métriques, tableaux et graphiques des expériences
 ├── src/
-│   ├── data/              # download, extraction OCR, préparation
-│   ├── models/            # classification de clauses
-│   ├── retrieval/         # BM25, dense, hybride
-│   ├── judge/             # jugement de conformité
-│   └── api/               # service FastAPI
+│   ├── data/        # téléchargement et préparation des données
+│   ├── models/      # classification des clauses
+│   ├── retrieval/   # recherche d'articles (RAG)
+│   ├── judge/       # jugement de conformité
+│   └── api/         # service FastAPI
 ├── tests/
-├── notebooks/
-├── docs/                  # fiche projet, diagrammes, rapports d'évaluation
-├── dvc.yaml               # pipeline de données reproductible
-├── params.yaml            # hyperparamètres centralisés
-└── docker-compose.yml     # API + serveur MLflow
+├── docs/            # fiche projet, diagrammes, captures
+├── dvc.yaml         # pipeline de données reproductible
+└── params.yaml      # hyperparamètres
 ```
 
 ---
 
 ## État d'avancement
 
-- [ ] Éval 1 — Idée de projet (10 %)
-- [ ] Éval 2 — Données + classification (20 %)
-- [ ] Éval 3 — RAG + jugement + API (20 %)
-- [ ] Éval 4 — Orchestration + monitoring + soutenance (50 %)
+| Phase | Contenu | État |
+| --- | --- | --- |
+| 1. Fondations | Dépôt, DVC, MLflow, données CUAD | Terminé |
+| 2. Classification | 7 modèles comparés, Legal-BERT retenu | Terminé |
+| 3. Corpus de lois | RGPD et loi tunisienne, article par article | À faire |
+| 4. Recherche d'articles | BM25, recherche dense, hybride | À faire |
+| 5. Jugement | LLM qui évalue la conformité et cite l'article | À faire |
+| 6. Big Data | Kafka, Spark, data lake | À faire |
+| 7. Produit | API, interface web, Docker | À faire |
+| 8. MLOps avancé | Orchestration, CI/CD, monitoring | À faire |
+| 9. Soutenance | Démo, rapport final | À faire |
+
+---
+
+## Équipe
+
+| Membre | Rôle |
+| --- | --- |
+| À compléter | À compléter |
+| À compléter | À compléter |
+| À compléter | À compléter |
+| À compléter | À compléter |
