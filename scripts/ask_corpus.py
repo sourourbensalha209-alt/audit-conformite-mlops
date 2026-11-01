@@ -55,6 +55,8 @@ def main() -> None:
         flags = [f for f, on in (("non validé", not a.validated), ("à vérifier", a.under_review)) if on]
         print(f"{i}. {a.citation()}" + (f"   [{', '.join(flags)}]" if flags else ""))
         print("   " + " ".join(a.text.split())[:220] + ("..." if len(a.text) > 220 else ""))
+        if a.provenance:
+            print("   Source : " + a.provenance[:200] + ("..." if len(a.provenance) > 200 else ""))
 
 
 if __name__ == "__main__":

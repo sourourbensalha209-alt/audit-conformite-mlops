@@ -326,3 +326,65 @@ def test_nettoyage_pdf_retire_l_entete_mais_jamais_le_corps():
     assert texte.count("Le texte de l'article impose") == 6                            # corps intact, même répété
     assert texte.count("a) premier point") == 6
     assert any("LEGISLATION" in n for n, _ in found)                                   # et signalé à l'utilisateur
+
+
+def test_depot_d_un_pdf_du_journal_officiel(tmp_path, monkeypatch):
+    """Un PDF déposé dans le dossier est lu, découpé en articles, et signale la loi qu'il modifie."""
+    from src.retrieval import law_watch
+
+    texte_pdf = ("République Tunisienne\nJournal officiel\n"
+                 "Loi n° 9003-07 du 2 octobre 9003 portant modification de la loi n° 9001-01 sur la conservation\n"
+                 "Article premier. - Les données sont conservées deux ans au plus.\n"
+                 "Art. 2. - Le registre est tenu à jour.\n")
+    monkeypatch.setattr(law_watch, "read_pdf_text", lambda path: texte_pdf)
+
+    w, store, index = _watcher(tmp_path)
+    w.run_once()
+    (tmp_path / "inbox").mkdir(exist_ok=True)
+    (tmp_path / "inbox" / "JORT_n°110_Loi-9003-07.pdf").write_bytes(b"%PDF-1.4 faux pdf")
+    r = w.run_once()
+    assert r["sources"]["inbox"]["ajoutés"] == 2
+    assert r["sources"]["inbox"]["signalés"] == 5                     # la loi visée est signalée "à vérifier"
+    assert "sans_article" not in r["sources"]["inbox"]
+    new = [a for a in store.load().values() if a.source_id.startswith("jort") or "9003" in a.law_title]
+    assert new and new[0].law_title.startswith("Loi n° 9003-07")      # le titre est celui de la loi, pas "République Tunisienne"
+    assert not any(a.validated for a in new)                          # texte déposé : non validé tant qu'on ne l'a pas confirmé
+
+    assert w.run_once()["changed"] is False                           # re-passage : le PDF n'est pas relu ni re-signalé
+
+
+def test_pdf_illisible_est_signale(tmp_path, monkeypatch):
+    from src.retrieval import law_watch
+
+    monkeypatch.setattr(law_watch, "read_pdf_text", lambda path: "Page de garde sans aucun article")
+    w, store, _ = _watcher(tmp_path)
+    (tmp_path / "inbox").mkdir(exist_ok=True)
+    (tmp_path / "inbox" / "scan.pdf").write_bytes(b"%PDF-1.4")
+    r = w.run_once()
+    assert r["sources"]["inbox"]["sans_article"] == ["scan.pdf"]       # on le dit, on ne se tait pas
+
+
+def test_chaque_regle_a_sa_definition_cuad(book):
+    assert len(book.rules) == 41
+    for r in book.rules:
+        assert r["definition_cuad"].strip() and "CUAD" in r["provenance"]
+    arts = rules_to_articles(book)
+    assert all("CUAD" in a.provenance and a.validated for a in arts)
+
+
+def test_la_classe_autre_n_a_pas_besoin_de_regle(book):
+    labels = _find_labels()
+    if labels is None:
+        pytest.skip("labels.json introuvable")
+    assert validate_against_labels(book, labels + ["Autre"]) == {"sans_regle": [], "regle_orpheline": [], "doublons": []}
+
+
+@pytest.mark.parametrize("titre", [
+    "Loi n° 2026-12 du 1 octobre 2026 portant modification de la loi n° 2004-63 du 27 juillet 2004",
+    "Loi n° 2026‐12 portant modification de la loi organique n° 2004‐63 du 27 juillet 2004",   # tiret U+2010
+    "Loi nº 2026-12 modifiant la loi organique nº 2004-63",                                    # nº
+    "Loi no 2026-12 complétant la loi no 2004-63",                                             # style UE
+    "Loi n° 2026–12 abrogeant la loi n° 2004–63",                                              # demi-cadratin
+])
+def test_detection_des_variantes_typographiques(titre):
+    assert detect_amendment_targets(titre) == ["2004-63"]

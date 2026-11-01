@@ -45,8 +45,11 @@ sources:
   #   path: data/corpus_raw/tn_coc_fr.txt
   #   jurisdiction: TN
 
-  # Dépôt manuel : un juriste (ou la démonstration) dépose un texte nouveau ici, un fichier .txt par texte.
-  # En-tête optionnel en tête de fichier :
+  # Dépôt de textes nouveaux, par exemple un texte du Journal officiel (JORT, www.iort.gov.tn).
+  # Le JORT n'offre pas de flux automatique : on dépose le PDF (ou un .txt) du texte dans data/law_inbox,
+  # puis on lance la veille. Elle lit le PDF, le découpe en articles, repère la loi qu'il modifie
+  # ("Loi n° 2026-12 portant modification de la loi n° 2004-63") et la signale "à vérifier".
+  # Un .txt peut commencer par un en-tête facultatif :
   #   # id: tn-loi-2026-12
   #   # title: Loi n° 2026-12 du ... portant modification de la loi n° 2004-63 ...
   #   # publication_date: 2026-09-30
@@ -62,7 +65,8 @@ sources:
   # régulière de la page des derniers textes.
   # >>> À AJUSTER : ouvrir le site, repérer la page qui liste les derniers numéros/textes, coller son
   # >>> adresse dans "url" et adapter "link_pattern" (expression régulière appliquée aux adresses des liens).
-  # Désactivé tant que l'adresse n'est pas vérifiée : décommenter ensuite.
+  # OPTIONNEL : désactivé, car le site n'offre ni flux ni liste stable à interroger automatiquement.
+  # Le dépôt de PDF ci-dessus est la voie retenue. À décommenter seulement si une page de liste stable existe.
   # - id: jort
   #   title: Journal officiel de la République tunisienne
   #   kind: jort_listing

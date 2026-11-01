@@ -1,7 +1,8 @@
 {
-  "version": "0.1",
-  "validated": false,
-  "avertissement": "Règles de bonne pratique contractuelle proposées par l'équipe, à valider par un juriste. Elles ne sont pas des articles de loi.",
+  "version": "0.2",
+  "validated": true,
+  "validation": "Chaque règle est rattachée à la définition officielle de sa catégorie dans CUAD. Aucune relecture juridique n'a été réalisée.",
+  "avertissement": "Règles de contrôle formulées par l'équipe, pas des articles de loi.",
   "rules": [
     {
       "id": "R01",
@@ -10,7 +11,9 @@
       "regle": "Si la licence s'étend aux sociétés affiliées du licencié, le contrat définit la notion d'affilié (seuil de contrôle) et précise que le licencié reste responsable des actes de ses affiliés.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "affiliate licensee license extends subsidiaries controlled entities"
+      "keywords_en": "affiliate licensee license extends subsidiaries controlled entities",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Does the contract contain a license grant to a licensee (incl. sublicensor) and the affiliates of such licensee/sublicensor?"
     },
     {
       "id": "R02",
@@ -19,7 +22,9 @@
       "regle": "Si des affiliés du concédant concèdent des droits, le contrat identifie les droits concernés, garantit que le concédant peut les concéder et précise qui répond des garanties.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "affiliate licensor license granted by affiliates of licensor"
+      "keywords_en": "affiliate licensor license granted by affiliates of licensor",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Does the contract contain a license grant by affiliates of the licensor or that includes intellectual property of affiliates of the licensor?"
     },
     {
       "id": "R03",
@@ -28,7 +33,9 @@
       "regle": "Le contrat indique sa date de conclusion (signature) de façon non ambiguë.",
       "gravite": "medium",
       "absence_a_signaler": true,
-      "keywords_en": "agreement dated made and entered into as of date"
+      "keywords_en": "agreement dated made and entered into as of date",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "The date of the contract"
     },
     {
       "id": "R04",
@@ -37,7 +44,9 @@
       "regle": "La cession du contrat ou des droits par une partie est subordonnée à l'accord écrit de l'autre. Vérifier que la règle est réciproque et que les exceptions (fusion, société affiliée, successeur) sont explicites.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "assign assignment transfer consent prior written consent delegate"
+      "keywords_en": "assign assignment transfer consent prior written consent delegate",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is consent or notice required of a party if the contract is assigned to a third party?"
     },
     {
       "id": "R05",
@@ -46,7 +55,9 @@
       "regle": "Tout droit d'audit est encadré : fréquence, préavis, périmètre, confidentialité des informations consultées et répartition des coûts.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "audit inspect records books examine upon notice"
+      "keywords_en": "audit inspect records books examine upon notice",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Does a party have the right to audit the books, records, or physical locations of the counterparty to ensure compliance with the contract?"
     },
     {
       "id": "R06",
@@ -55,7 +66,9 @@
       "regle": "La responsabilité de chaque partie est plafonnée (montant fixe ou référence, par exemple les sommes payées sur les 12 derniers mois). Le plafond s'applique aux deux parties et les exceptions (dol, faute lourde, confidentialité, propriété intellectuelle) sont listées expressément.",
       "gravite": "high",
       "absence_a_signaler": true,
-      "keywords_en": "limitation of liability aggregate liability shall not exceed cap fees paid twelve months"
+      "keywords_en": "limitation of liability aggregate liability shall not exceed cap fees paid twelve months",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Does the contract include a cap on liability upon the breach of a party’s obligation? This includes time limitation for the counterparty to bring claims or maximum amount for recovery."
     },
     {
       "id": "R07",
@@ -64,7 +77,9 @@
       "regle": "Si un changement de contrôle donne un droit de résiliation ou exige un consentement, le déclencheur est défini (seuil, opération visée), le délai d'exercice est précisé et la clause est réciproque.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "change of control merger acquisition ownership terminate consent"
+      "keywords_en": "change of control merger acquisition ownership terminate consent",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Does one party have the right to terminate or is consent or notice required of the counterparty if such party undergoes a change of control, such as a merger, stock sale, transfer of all or substantially all of its assets or business, or assignment by operation of law?"
     },
     {
       "id": "R08",
@@ -73,7 +88,9 @@
       "regle": "Les exceptions aux clauses d'exclusivité ou de non-concurrence (activités existantes, produits exclus, participations minoritaires) sont énumérées de façon limitative.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "exception exclusivity non-compete notwithstanding provided that shall not restrict"
+      "keywords_en": "exception exclusivity non-compete notwithstanding provided that shall not restrict",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "This category includes the exceptions or carveouts to Non-Compete, Exclusivity and No-Solicit of Customers above."
     },
     {
       "id": "R09",
@@ -82,7 +99,9 @@
       "regle": "Un engagement de ne pas agir en justice précise sa portée (droits ou produits visés), sa durée et s'il est réciproque.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "covenant not to sue shall not bring claim assert patent against"
+      "keywords_en": "covenant not to sue shall not bring claim assert patent against",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is a party restricted from contesting the validity of the counterparty’s ownership of intellectual property or otherwise bringing a claim against the counterparty for matters unrelated to the contract?"
     },
     {
       "id": "R10",
@@ -91,7 +110,9 @@
       "regle": "Le contrat porte un intitulé qui permet de l'identifier et d'en connaître la nature.",
       "gravite": "low",
       "absence_a_signaler": true,
-      "keywords_en": "agreement contract title name of document"
+      "keywords_en": "agreement contract title name of document",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "The name of the contract"
     },
     {
       "id": "R11",
@@ -100,7 +121,9 @@
       "regle": "La date d'entrée en vigueur est précisée ; si elle diffère de la date de signature, la différence et sa condition (événement, formalité) sont expliquées.",
       "gravite": "medium",
       "absence_a_signaler": true,
-      "keywords_en": "effective date commence take effect as of"
+      "keywords_en": "effective date commence take effect as of",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "The date when the contract is effective"
     },
     {
       "id": "R12",
@@ -109,7 +132,9 @@
       "regle": "Toute exclusivité précise son périmètre (produits, territoire, clients), sa durée, ses contreparties et ses exceptions. Vérifier sa compatibilité avec le droit de la concurrence applicable.",
       "gravite": "high",
       "absence_a_signaler": false,
-      "keywords_en": "exclusive exclusivity sole and exclusive territory only"
+      "keywords_en": "exclusive exclusivity sole and exclusive territory only",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is there an exclusive dealing commitment with the counterparty? This includes a commitment to procure all “requirements” from one party of certain technology, goods, or services or a prohibition on licensing or selling technology, goods or services to third parties, or a prohibition on collaborating or working with other parties), whether during the contract or after the contract ends (or both)."
     },
     {
       "id": "R13",
@@ -118,7 +143,9 @@
       "regle": "La durée initiale du contrat ou sa date d'échéance est indiquée clairement, avec son point de départ.",
       "gravite": "high",
       "absence_a_signaler": true,
-      "keywords_en": "term expires expiration initial term years from the effective date"
+      "keywords_en": "term expires expiration initial term years from the effective date",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "On what date will the contract's initial term expire?"
     },
     {
       "id": "R14",
@@ -127,7 +154,9 @@
       "regle": "Le droit applicable au contrat est désigné expressément. Vérifier la cohérence avec la juridiction ou le mode de règlement des litiges prévus, et la validité du choix pour ce type de contrat.",
       "gravite": "high",
       "absence_a_signaler": true,
-      "keywords_en": "governed by laws of jurisdiction construed in accordance with"
+      "keywords_en": "governed by laws of jurisdiction construed in accordance with",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Which state/country's law governs the interpretation of the contract?"
     },
     {
       "id": "R15",
@@ -136,7 +165,9 @@
       "regle": "Les assurances exigées sont précisées : types de couverture, montants minimaux, durée, et obligation de fournir une attestation.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "insurance coverage certificate policy maintain insurer"
+      "keywords_en": "insurance coverage certificate policy maintain insurer",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is there a requirement for insurance that must be maintained by one party for the benefit of the counterparty?"
     },
     {
       "id": "R16",
@@ -145,7 +176,9 @@
       "regle": "La cession de droits de propriété intellectuelle désigne précisément les œuvres ou inventions visées, l'étendue des droits cédés, la contrepartie et les formalités. Vérifier les droits qui ne peuvent pas être cédés selon le droit applicable.",
       "gravite": "high",
       "absence_a_signaler": false,
-      "keywords_en": "assign ownership intellectual property work product title and interest invention"
+      "keywords_en": "assign ownership intellectual property work product title and interest invention",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Does intellectual property created by one party become the property of the counterparty, either per the terms of the contract or upon the occurrence of certain events?"
     },
     {
       "id": "R17",
@@ -154,7 +187,9 @@
       "regle": "Une licence irrévocable ou perpétuelle précise ses seules causes de fin (par exemple manquement grave non réparé) et la contrepartie versée pour une durée sans limite.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "irrevocable perpetual license in perpetuity paid-up"
+      "keywords_en": "irrevocable perpetual license in perpetuity paid-up",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Does the contract contain a license grant that is irrevocable or perpetual?"
     },
     {
       "id": "R18",
@@ -163,7 +198,9 @@
       "regle": "En cas de copropriété, le contrat fixe les quotes-parts, le droit d'exploiter, les conditions pour concéder une licence ou céder sa part, et qui supporte les frais de protection.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "jointly owned joint ownership co-own intellectual property both parties"
+      "keywords_en": "jointly owned joint ownership co-own intellectual property both parties",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is there any clause providing for joint or shared ownership of intellectual property between the parties to the contract?"
     },
     {
       "id": "R19",
@@ -172,7 +209,9 @@
       "regle": "La licence précise son objet, son étendue, son territoire, sa durée, son caractère exclusif ou non, et le droit ou non de sous-licencier.",
       "gravite": "high",
       "absence_a_signaler": false,
-      "keywords_en": "grants license non-exclusive right to use sublicense territory licensed"
+      "keywords_en": "grants license non-exclusive right to use sublicense territory licensed",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Does the contract contain a license granted by one party to its counterparty?"
     },
     {
       "id": "R20",
@@ -181,7 +220,9 @@
       "regle": "Les pénalités forfaitaires correspondent à un déclencheur précis et à un montant proportionné au préjudice prévisible. Vérifier le pouvoir du juge de les réviser selon le droit applicable.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "liquidated damages penalty shall pay per day delay"
+      "keywords_en": "liquidated damages penalty shall pay per day delay",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Does the contract contain a clause that would award either party liquidated damages for breach or a fee upon the termination of a contract (termination fee)?"
     },
     {
       "id": "R21",
@@ -190,7 +231,9 @@
       "regle": "Un engagement minimum (volume ou montant) est chiffré, avec sa période de mesure et les conséquences d'un engagement non atteint.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "minimum commitment minimum purchase at least shortfall take or pay"
+      "keywords_en": "minimum commitment minimum purchase at least shortfall take or pay",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is there a minimum order size or minimum amount or units per-time period that one party must buy from the counterparty under the contract?"
     },
     {
       "id": "R22",
@@ -199,7 +242,9 @@
       "regle": "La clause précise le périmètre comparé, le mécanisme de vérification, le délai d'alignement et la sanction en cas de non-respect.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "most favored nation lowest price no less favorable terms best price"
+      "keywords_en": "most favored nation lowest price no less favorable terms best price",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is there a clause that if a third party gets better terms on the licensing or sale of technology/goods/services described in the contract, the buyer of such technology/goods/services under the contract shall be entitled to those better terms?"
     },
     {
       "id": "R23",
@@ -208,7 +253,9 @@
       "regle": "L'interdiction de démarcher les clients est limitée dans le temps, dans son périmètre et dans son objet.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "not solicit customers clients accounts business of"
+      "keywords_en": "not solicit customers clients accounts business of",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is a party restricted from contracting or soliciting customers or partners of the counterparty, whether during the contract or after the contract ends (or both)?"
     },
     {
       "id": "R24",
@@ -217,7 +264,9 @@
       "regle": "La non-sollicitation du personnel a une durée limitée et excepte les candidatures spontanées et les offres publiques d'emploi.",
       "gravite": "low",
       "absence_a_signaler": false,
-      "keywords_en": "not solicit employees hire personnel recruit"
+      "keywords_en": "not solicit employees hire personnel recruit",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is there a restriction on a party’s soliciting or hiring employees and/or contractors from the counterparty, whether during the contract or after the contract ends (or both)?"
     },
     {
       "id": "R25",
@@ -226,7 +275,9 @@
       "regle": "La non-concurrence est limitée dans le temps, dans l'espace et dans son objet, proportionnée à l'intérêt protégé, et vérifiée au regard du droit applicable.",
       "gravite": "high",
       "absence_a_signaler": false,
-      "keywords_en": "non-compete shall not compete competing business restricted period"
+      "keywords_en": "non-compete shall not compete competing business restricted period",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is there a restriction on the ability of a party to compete with the counterparty or operate in a certain geography or business or technology sector?"
     },
     {
       "id": "R26",
@@ -235,7 +286,9 @@
       "regle": "L'obligation de non-dénigrement est réciproque, de portée précise, et réserve les déclarations exigées par la loi ou une autorité.",
       "gravite": "low",
       "absence_a_signaler": false,
-      "keywords_en": "disparage non-disparagement negative statements reputation"
+      "keywords_en": "disparage non-disparagement negative statements reputation",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is there a requirement on a party not to disparage the counterparty?"
     },
     {
       "id": "R27",
@@ -244,7 +297,9 @@
       "regle": "La non-transférabilité de la licence est exprimée clairement, avec ses exceptions éventuelles (affiliés, successeur en cas de fusion).",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "non-transferable not transfer license shall not be assigned"
+      "keywords_en": "non-transferable not transfer license shall not be assigned",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Does the contract limit the ability of a party to transfer the license being granted to a third party?"
     },
     {
       "id": "R28",
@@ -253,7 +308,9 @@
       "regle": "Le préavis pour empêcher le renouvellement est explicite, d'une durée raisonnable, avec la forme de notification et la partie qui peut l'exercer.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "notice of non-renewal days prior written notice before expiration renew"
+      "keywords_en": "notice of non-renewal days prior written notice before expiration renew",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "What is the notice period required to terminate renewal?"
     },
     {
       "id": "R29",
@@ -262,7 +319,9 @@
       "regle": "Chaque partie est identifiée complètement : dénomination, forme juridique, siège ou adresse, et représentant ayant pouvoir d'engager.",
       "gravite": "high",
       "absence_a_signaler": true,
-      "keywords_en": "by and between party parties company inc corporation address"
+      "keywords_en": "by and between party parties company inc corporation address",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "The two or more parties who signed the contract"
     },
     {
       "id": "R30",
@@ -271,7 +330,9 @@
       "regle": "Les obligations après la fin du contrat (assistance à la transition, restitution des données, survie de certaines clauses) sont précisées.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "upon termination transition assistance return data survive following termination"
+      "keywords_en": "upon termination transition assistance return data survive following termination",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is a party subject to obligations after the termination or expiration of a contract, including any post-termination transition, payment, transfer of IP, wind-down, last-buy, or similar commitments?"
     },
     {
       "id": "R31",
@@ -280,7 +341,9 @@
       "regle": "Toute restriction portant sur les prix pratiqués par une partie est vérifiée au regard du droit de la concurrence applicable ; un prix imposé est signalé.",
       "gravite": "high",
       "absence_a_signaler": false,
-      "keywords_en": "price resale price shall not charge pricing restriction minimum price"
+      "keywords_en": "price resale price shall not charge pricing restriction minimum price",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is there a restriction on the ability of a party to raise or reduce prices of technology, goods, or services provided?"
     },
     {
       "id": "R32",
@@ -289,7 +352,9 @@
       "regle": "Les modalités de renouvellement (tacite ou expresse) et la durée de chaque période de renouvellement sont indiquées.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "renew renewal automatically successive additional term"
+      "keywords_en": "renew renewal automatically successive additional term",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "What is the renewal term after the initial term expires? This includes automatic extensions and unilateral extensions with prior notice."
     },
     {
       "id": "R33",
@@ -298,7 +363,9 @@
       "regle": "Le partage de revenus ou de profits précise l'assiette, le taux, le calendrier de versement et le droit de vérifier les calculs.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "revenue share profit sharing royalty percentage of net revenue"
+      "keywords_en": "revenue share profit sharing royalty percentage of net revenue",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is one party required to share revenue or profit with the counterparty for any technology, goods, or services?"
     },
     {
       "id": "R34",
@@ -307,7 +374,9 @@
       "regle": "Un droit de préemption, de première offre ou de première négociation précise sa procédure, ses délais et les conditions de la transaction visée.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "right of first refusal first offer first negotiation"
+      "keywords_en": "right of first refusal first offer first negotiation",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is there a clause granting one party a right of first refusal, right of first offer or right of first negotiation to purchase, license, market, or distribute equity interest, technology, assets, products or services?"
     },
     {
       "id": "R35",
@@ -316,7 +385,9 @@
       "regle": "Le séquestre du code source désigne le tiers séquestre, les cas de libération, la mise à jour des versions déposées et la prise en charge des frais.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "source code escrow escrow agent release conditions deposit"
+      "keywords_en": "source code escrow escrow agent release conditions deposit",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is one party required to deposit its source code into escrow with a third party, which can be released to the counterparty upon the occurrence of certain events (bankruptcy, insolvency, etc.)?"
     },
     {
       "id": "R36",
@@ -325,7 +396,9 @@
       "regle": "Une résiliation sans motif précise la partie qui en bénéficie, le préavis et les conséquences financières. Vérifier la réciprocité.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "terminate for convenience without cause upon days notice"
+      "keywords_en": "terminate for convenience without cause upon days notice",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Can a party terminate this contract without cause (solely by giving a notice and allowing a waiting period to expire)?"
     },
     {
       "id": "R37",
@@ -334,7 +407,9 @@
       "regle": "Les tiers bénéficiaires sont identifiés avec la portée de leurs droits ; à défaut, le contrat exclut expressément tout droit des tiers.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "third party beneficiary no third party rights beneficiaries"
+      "keywords_en": "third party beneficiary no third party rights beneficiaries",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is there a non-contracting party who is a beneficiary to some or all of the clauses in the contract and therefore can enforce its rights against a contracting party?"
     },
     {
       "id": "R38",
@@ -343,7 +418,9 @@
       "regle": "Les cas de responsabilité illimitée sont limités à des situations justifiées (dol, faute lourde, dommage corporel...) et vérifiés selon le droit applicable. Une extension large est signalée.",
       "gravite": "high",
       "absence_a_signaler": false,
-      "keywords_en": "unlimited liability not subject to cap uncapped exclusions gross negligence willful"
+      "keywords_en": "unlimited liability not subject to cap uncapped exclusions gross negligence willful",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is a party’s liability uncapped upon the breach of its obligation in the contract? This also includes uncap liability for a particular type of breach such as IP infringement or breach of confidentiality obligation."
     },
     {
       "id": "R39",
@@ -352,7 +429,9 @@
       "regle": "Une licence d'usage illimité définit tout de même le périmètre d'utilisation (entités, finalité) et ses limites contre les abus.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "unlimited use enterprise license any number of users all you can eat"
+      "keywords_en": "unlimited use enterprise license any number of users all you can eat",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is there a clause granting one party an “enterprise,” “all you can eat” or unlimited usage license?"
     },
     {
       "id": "R40",
@@ -361,7 +440,9 @@
       "regle": "Les plafonds ou seuils de volume sont définis, avec leur période de calcul et les conséquences en cas de dépassement.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "volume limit not exceed maximum quantity units per year"
+      "keywords_en": "volume limit not exceed maximum quantity units per year",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "Is there a fee increase or consent requirement, etc. if one party’s use of the product/services exceeds certain threshold?"
     },
     {
       "id": "R41",
@@ -370,7 +451,9 @@
       "regle": "La durée de garantie est précisée avec son point de départ, ainsi que le recours en cas de défaut.",
       "gravite": "medium",
       "absence_a_signaler": false,
-      "keywords_en": "warranty period warranted for months remedy defect repair replace"
+      "keywords_en": "warranty period warranted for months remedy defect repair replace",
+      "provenance": "Définition officielle CUAD (The Atticus Project)",
+      "definition_cuad": "What is the duration of any warranty against defects or errors in technology, products, or services provided under the contract?"
     }
   ],
   "rgpd_checks": [

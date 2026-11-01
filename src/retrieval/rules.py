@@ -16,6 +16,7 @@ from pathlib import Path
 from .corpus import Article, hash_text
 
 RULES_SOURCE_ID = "rules"
+NEUTRAL_LABEL = "Autre"     # classe des paragraphes qui ne sont aucune des 41 catégories
 
 
 @dataclass
@@ -57,6 +58,7 @@ def rgpd_candidate(book: RuleBook, clause_text: str) -> bool:
 def validate_against_labels(book: RuleBook, labels: list[str]) -> dict[str, list[str]]:
     """Vérifie que chaque catégorie du classifieur a exactement une règle (et inversement)."""
     cats = [r["category"] for r in book.rules]
+    labels = [l for l in labels if l != NEUTRAL_LABEL]      # la classe "Autre" n'a pas de règle : c'est voulu
     return {
         "sans_regle": sorted(set(labels) - set(cats)),
         "regle_orpheline": sorted(set(cats) - set(labels)),
@@ -71,6 +73,9 @@ def rules_to_articles(book: RuleBook) -> list[Article]:
     out = []
     for r in book.rules:
         text = f"{r['titre']}. {r['regle']}"
+        provenance = r.get("provenance", "")
+        if r.get("definition_cuad"):
+            provenance += f" : « {r['definition_cuad']} »"
         out.append(Article(
             article_id=f"{RULES_SOURCE_ID}:{r['id']}",
             source_id=RULES_SOURCE_ID,
@@ -79,8 +84,9 @@ def rules_to_articles(book: RuleBook) -> list[Article]:
             text=text,
             lang="fr",
             jurisdiction="playbook",
-            content_hash=hash_text(text + r["keywords_en"] + r["category"]),
+            content_hash=hash_text(text + r["keywords_en"] + r["category"] + provenance),
             validated=book.validated,
             keywords=f"{r['category']} {r['keywords_en']}",
+            provenance=provenance,
         ))
     return out

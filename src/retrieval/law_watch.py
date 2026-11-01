@@ -52,6 +52,7 @@ import yaml
 from .corpus import Change, CorpusStore, now_iso, parse_articles
 from .index import HybridIndex, strip_accents
 from .rules import load_rules, rules_to_articles
+from .textclean import strip_page_noise
 
 USER_AGENT = "audit-conformite-veille/1.0 (projet etudiant TEK-UP)"
 
@@ -188,6 +189,28 @@ def bytes_to_text(data: bytes, content_type: str, url: str) -> str:
     return html_to_text(html)
 
 
+def read_pdf_text(path: Path) -> str:
+    """Texte d'un PDF de loi (par exemple un texte du Journal officiel), sans en-têtes ni numéros de page."""
+    import pdfplumber
+
+    with pdfplumber.open(path) as pdf:
+        pages = [(page.extract_text() or "").splitlines() for page in pdf.pages]
+    kept, _, _ = strip_page_noise(pages)
+    return "\n".join(kept)
+
+
+_TITLE_RE = re.compile(r"^\s*(?:loi organique|loi|décret-loi|decret-loi|décret|decret|arrêté|arrete|ordonnance)\b", re.I)
+
+
+def guess_title(body: str, fallback: str) -> str:
+    """Titre d'un texte : la première ligne qui commence par Loi / Décret / Arrêté, sinon la première ligne."""
+    lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+    for ln in lines[:20]:
+        if _TITLE_RE.match(ln):
+            return ln
+    return lines[0] if lines else fallback
+
+
 def split_header(text: str) -> tuple[dict[str, str], str]:
     """En-tête optionnel d'un fichier déposé :
         # id: tn-loi-2026-12
@@ -210,8 +233,11 @@ def split_header(text: str) -> tuple[dict[str, str], str]:
 # Détection : pertinence et modifications d'autres lois
 # --------------------------------------------------------------------------- #
 
+# "loi n° 2004-63", mais aussi "loi no 2004-63", "loi nº 2004‐63" (tiret spécial U+2010 vu dans de vrais PDF tunisiens)
+_DASH = "[-‐‑‒–—−]"
+_NUM = r"(?:n\s*[°º˚]|no\.?|n\.)"
 _REF_RE = re.compile(
-    r"(?:loi organique|loi|décret-loi|decret-loi|décret|decret|arrêté|arrete)\s+n°\s*(\d{4})\s*[-–]\s*(\d+)", re.I)
+    rf"(?:loi organique|loi|décret-loi|decret-loi|décret|decret|arrêté|arrete|ordonnance)\s+{_NUM}\s*(\d{{4}})\s*{_DASH}\s*(\d+)", re.I)
 _AMEND_RE = re.compile(r"modifi|compl[eé]t|abrog|remplac|rectifi", re.I)
 
 
@@ -220,7 +246,7 @@ def detect_amendment_targets(head: str) -> list[str]:
     Ex. : "Loi n° 2026-12 portant modification de la loi n° 2004-63" -> ["2004-63"]."""
     if not _AMEND_RE.search(head):
         return []
-    refs = [f"{y}-{n}" for y, n in _REF_RE.findall(head)]
+    refs = [f"{y}-{n}" for y, n in _REF_RE.findall(head)]   # toujours avec un tiret ASCII
     if refs and _REF_RE.match(head.strip()):      # la 1re référence est le numéro du texte lui-même
         refs = refs[1:]
     return list(dict.fromkeys(refs))
@@ -253,7 +279,7 @@ def _effective_from(publication_date: str | None) -> str | None:
 
 
 def _slug(title: str, url: str = "") -> str:
-    m = re.search(r"(loi organique|loi|décret-loi|décret|arrêté)\s+n°\s*(\d{4})\s*[-–]\s*(\d+)", title, re.I)
+    m = re.search(rf"(loi organique|loi|décret-loi|décret|arrêté)\s+{_NUM}\s*(\d{{4}})\s*{_DASH}\s*(\d+)", title, re.I)
     if m:
         kind = strip_accents(m.group(1).lower()).replace(" ", "-")
         return f"tn-{kind}-{m.group(2)}-{m.group(3)}"
@@ -341,12 +367,30 @@ class Watcher:
         return self.store.apply_snapshot(src.id, articles, full_snapshot=True)
 
     def _sync_inbox(self, src: Source) -> dict:
+        """Dossier de dépôt : un .txt ou un .pdf par texte (par exemple un texte du Journal officiel)."""
         folder = self.root / src.path
         folder.mkdir(parents=True, exist_ok=True)
+        st = self.state.setdefault(src.id, {"files": {}})
         total: list[Change] = []
-        for f in sorted(folder.glob("*.txt")):
-            total += self._ingest_document(src, f.read_text(encoding="utf-8"), doc_id=f.stem)
-        return self._summarize(total)
+        no_article: list[str] = []
+        for f in sorted(list(folder.glob("*.txt")) + list(folder.glob("*.pdf"))):
+            sig = f"{f.stat().st_size}-{int(f.stat().st_mtime)}"
+            if f.suffix.lower() == ".pdf":
+                if st["files"].get(f.name) == sig:
+                    continue                                    # PDF déjà lu, inchangé : inutile de le relire
+                text = read_pdf_text(f)
+                doc_id = re.sub(r"[^a-z0-9]+", "-", f.stem.lower()).strip("-")
+            else:
+                text, doc_id = f.read_text(encoding="utf-8"), f.stem
+            changes, n_articles = self._ingest_document(src, text, doc_id=doc_id)
+            st["files"][f.name] = sig
+            total += changes
+            if n_articles == 0:
+                no_article.append(f.name)
+        out = self._summarize(total)
+        if no_article:
+            out["sans_article"] = no_article          # lu mais illisible : le dire plutôt que se taire
+        return out
 
     def _sync_listing(self, src: Source) -> dict:
         st = self.state.setdefault(src.id, {"seen": [], "ignored": {}})
@@ -365,15 +409,15 @@ class Watcher:
                 ignored += 1
                 continue
             text = f"# title: {link.title}\n# url: {link.url}\n" + body
-            total += self._ingest_document(src, text, doc_id=_slug(link.title, link.url))
+            total += self._ingest_document(src, text, doc_id=_slug(link.title, link.url))[0]
         out = self._summarize(total)
         out["ignores_non_pertinents"] = ignored
         return out
 
-    def _ingest_document(self, src: Source, text: str, doc_id: str) -> list[Change]:
+    def _ingest_document(self, src: Source, text: str, doc_id: str) -> tuple[list[Change], int]:
         meta, body = split_header(text)
         sid = meta.get("id", doc_id)
-        title = meta.get("title") or next((ln.strip() for ln in body.splitlines() if ln.strip()), sid)
+        title = meta.get("title") or guess_title(body, sid)
         pub = meta.get("publication_date")
         validated = meta["validated"].lower() == "true" if "validated" in meta else src.auto_validate
         articles = parse_articles(
@@ -387,7 +431,7 @@ class Watcher:
                 base = self.alias_map.get(ref)
                 if base and base != sid:
                     changes += self.store.flag_under_review(base, reference=title)
-        return changes
+        return changes, len(articles)
 
     # -- utilitaires
     @staticmethod
@@ -414,6 +458,8 @@ def print_report(report: dict) -> None:
             extra = f", {res['ignores_non_pertinents']} ignoré(s)" if res.get("ignores_non_pertinents") else ""
             print(f"  {sid:14s} +{res['ajoutés']} ajouté(s)  ~{res['modifiés']} modifié(s)  "
                   f"-{res['abrogés']} abrogé(s)  !{res['signalés']} à vérifier{extra}")
+            if res.get("sans_article"):
+                print(f"  {'':14s} ATTENTION, aucun article reconnu dans : {', '.join(res['sans_article'])}")
     if report["changed"]:
         extra = f" ({report['embedded']} article(s) ré-encodé(s))" if report["embedded"] else ""
         print(f"  Corpus {report['corpus_version_before']} -> {report['corpus_version_after']}{extra}")

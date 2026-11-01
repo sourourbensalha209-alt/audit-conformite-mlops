@@ -7,6 +7,7 @@ experience que la baseline.
 Usage :
     python -m src.models.log_benchmark                              # iteration 1
     python -m src.models.log_benchmark reports/benchmark_v2.json    # iteration 2
+    python -m src.models.log_benchmark reports/benchmark_v3.json    # iteration 3 (classe "Autre")
 
 Les fichiers images et CSV presents dans reports/ et portant le meme prefixe
 que le fichier de resultats sont joints au meilleur run.
@@ -22,7 +23,9 @@ from src.config import ROOT, REPORTS, MLFLOW_TRACKING_URI
 
 METRIC_KEYS = {"f1_macro", "f1_weighted", "accuracy", "f1_macro_rare",
                "train_minutes", "latency_ms_per_clause", "params_millions",
-               "best_epoch", "epochs_run"}
+               "best_epoch", "epochs_run",
+               "f1_macro_42_classes", "autre_rappel", "autre_precision",
+               "fantomes_classification", "clauses_classees_autre"}
 SKIP_KEYS = {"key", "label"}
 
 

@@ -9,9 +9,11 @@ Deux niveaux :
 from __future__ import annotations
 
 import json
+import re
 import statistics
 from pathlib import Path
 
+from .autre import NEUTRAL_LABEL
 from .segment import HARD_MAX, Segment, segment
 
 
@@ -22,7 +24,7 @@ def load_docs(path: Path | str) -> list[dict]:
         for line in f:
             r = json.loads(line)
             d = docs.setdefault(r["title"], {"title": r["title"], "text": r["context"], "spans": []})
-            cat = r["id"].split("__")[-1]
+            cat = re.sub(r"_\d+$", "", r["id"].split("__")[-1])      # le jeu d'entraînement ajoute _0, _1... à la catégorie
             for t, s in zip(r["answers"]["text"], r["answers"]["answer_start"]):
                 d["spans"].append((cat, s, s + len(t)))
     return list(docs.values())
@@ -77,26 +79,28 @@ def score_pipeline(docs: list[dict], segs_by_doc: list[list[Segment]], preds_by_
     Pour chaque seuil de confiance :
       rappel %      parmi les (contrat, catégorie) annotés par les juristes, part retrouvée sur un segment bon
       fantômes %    parmi les segments SANS annotation, part qui reçoit quand même une catégorie
-                    (c'est ce que le seuil, ou une classe "autre", doit faire baisser)
-      abstention %  part de tous les segments laissés "à vérifier" faute de confiance
+                    (c'est ce que le seuil, ou la classe "Autre", doit faire baisser)
+      abstention %  part de tous les segments laissés "à vérifier par un humain" faute de confiance
+      Autre %       part de tous les segments que le modèle classe « Autre » (aucune catégorie annoncée)
     """
     rows = []
     for thr in thresholds:
         wanted = found = 0
         neutral = ghosts = 0
-        total = abstained = 0
+        total = abstained = as_autre = 0
         for doc, segs, preds in zip(docs, segs_by_doc, preds_by_doc):
             ann = annotate_segments(doc, segs)
             hit: set[str] = set()
             for cats, (label, conf) in zip(ann, preds):
                 total += 1
+                neutral += not cats
+                if label == NEUTRAL_LABEL:                     # le modèle dit : "ce n'est aucune catégorie"
+                    as_autre += 1
+                    continue
                 if conf < thr:
                     abstained += 1
-                    if not cats:
-                        neutral += 1
                     continue
                 if not cats:
-                    neutral += 1
                     ghosts += 1
                 elif label in cats:
                     hit.add(label)
@@ -106,5 +110,6 @@ def score_pipeline(docs: list[dict], segs_by_doc: list[list[Segment]], preds_by_
         rows.append({"seuil": thr, "rappel %": round(100 * found / max(wanted, 1), 1),
                      "fantômes %": round(100 * ghosts / max(neutral, 1), 1),
                      "abstention %": round(100 * abstained / max(total, 1), 1),
+                     "Autre %": round(100 * as_autre / max(total, 1), 1),
                      "contrat-catégories annotées": wanted})
     return rows

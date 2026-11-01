@@ -44,7 +44,7 @@ def strip_page_noise(pages: list[list[str]]) -> tuple[list[str], int, list[tuple
         norms = {_norm(lines[i]) for i in edge_positions(len(lines)) if len(lines[i].strip()) >= MIN_LEN}
         for n in norms:
             presence[n] = presence.get(n, 0) + 1
-    threshold = max(4, int(MIN_SHARE * n_pages))
+    threshold = max(2, int(MIN_SHARE * n_pages))        # au moins 2 pages : un PDF de loi peut être très court
     repeated = {n: c for n, c in presence.items() if c >= threshold}
 
     kept: list[str] = []

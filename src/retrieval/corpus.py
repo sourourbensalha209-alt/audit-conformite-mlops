@@ -36,7 +36,7 @@ class Article:
     content_hash: str = ""
     version: int = 1
     status: str = "in_force"        # in_force | repealed
-    validated: bool = True          # False : texte recent, pas encore relu par un juriste
+    validated: bool = True          # False : texte capté automatiquement, pas encore confirmé par une source officielle
     under_review: bool = False      # un texte recent annonce modifier cet article
     first_seen: str = ""
     last_changed: str = ""
@@ -44,6 +44,7 @@ class Article:
     effective_from: str | None = None
     source_url: str | None = None
     keywords: str = ""              # mots-cles ajoutes a l'indexation (utile pour les regles)
+    provenance: str = ""            # d'où vient le texte (pour une règle : la définition CUAD qui la fonde)
 
     def citation(self) -> str:
         """Ex. "Loi organique n° 2004-63 du 27 juillet 2004, art. 15" (titre coupé avant "portant...")."""

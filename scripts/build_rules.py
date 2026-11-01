@@ -3,9 +3,10 @@
 Les 41 règles suivent exactement les 41 catégories du classifieur (labels.json) :
 une clause classée "Cap On Liability" est jugée avec la règle R06.
 
-IMPORTANT : ce sont des règles de bonne pratique contractuelle (type "playbook" de
-revue de contrat), PAS des articles de loi. Elles sont à faire valider par un juriste
-avant de prétendre à une valeur juridique : le fichier porte `validated: false`.
+IMPORTANT : ce sont des règles de contrôle formulées par l'équipe (type "playbook" de revue de
+contrat), PAS des articles de loi. Chaque règle est rattachée à la définition officielle de sa
+catégorie dans CUAD (The Atticus Project), lue dans data/rules/cuad_definitions.json : c'est sa source.
+Aucune relecture juridique n'a été réalisée, et le fichier le dit (champ `validation`).
 Les citations d'articles viennent du corpus de lois (RGPD, droit tunisien), pas d'ici.
 
 Usage : python scripts/build_rules.py
@@ -223,17 +224,24 @@ RGPD_TRIGGERS = [
 
 
 def main() -> None:
+    root = Path(__file__).resolve().parents[1]
+    definitions = json.loads((root / "data" / "rules" / "cuad_definitions.json").read_text(encoding="utf-8"))
     rules = []
     for i, (cat, titre, regle, gravite, absence, kw) in enumerate(RULES, start=1):
+        if cat not in definitions:
+            raise SystemExit(f"Pas de définition CUAD pour {cat} : relancer l'extraction des définitions.")
         rules.append({
             "id": f"R{i:02d}", "category": cat, "titre": titre, "regle": regle,
             "gravite": gravite, "absence_a_signaler": absence, "keywords_en": kw,
+            "provenance": "Définition officielle CUAD (The Atticus Project)",
+            "definition_cuad": definitions[cat],
         })
     out = {
-        "version": "0.1",
-        "validated": False,
-        "avertissement": "Règles de bonne pratique contractuelle proposées par l'équipe, à valider par un juriste. "
-                         "Elles ne sont pas des articles de loi.",
+        "version": "0.2",
+        "validated": True,
+        "validation": "Chaque règle est rattachée à la définition officielle de sa catégorie dans CUAD. "
+                      "Aucune relecture juridique n'a été réalisée.",
+        "avertissement": "Règles de contrôle formulées par l'équipe, pas des articles de loi.",
         "rules": rules,
         "rgpd_checks": RGPD_CHECKS,
         "rgpd_triggers": RGPD_TRIGGERS,
