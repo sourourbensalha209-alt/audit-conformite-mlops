@@ -93,10 +93,14 @@ _ART_RE = re.compile(
     r"(?:\s*[-–]?\s*\(?(bis|ter|quater|quinquies|nouveau)\)?)?"
     r"(?:\s*[:.\-–—)]\s*(?P<rest>.*)|\s*$)"
 )
-_HEADING_RE = re.compile(
-    r"^\s*(?:CHAPITRE|CHAPTER|SECTION|TITRE|TITLE|LIVRE|Chapitre|Chapter|Section|Titre|Title|Livre)"
-    r"\s+(?:premier|first|[IVXLC]+|\d+)\b.*$"
-)
+_KW = r"(?:CHAPITRE|CHAPTER|SECTION|TITRE|TITLE|LIVRE|Chapitre|Chapter|Section|Titre|Title|Livre)"
+_NUM = r"(?:premier|first|[IVXLC]+|\d+)"
+# "CHAPITRE IV" ou "Section 2" seuls sur la ligne : le titre suit sur la ou les lignes suivantes
+_HEADING_ALONE_RE = re.compile(rf"^\s*{_KW}\s+{_NUM}\s*$")
+# "Chapitre II : Des obligations" : numéro et titre sur la même ligne (séparateur obligatoire, pour ne pas
+# confondre avec une phrase qui commencerait par "Section 2 du présent chapitre...")
+_HEADING_INLINE_RE = re.compile(rf"^\s*{_KW}\s+{_NUM}\s*[:.\-–—]\s*\S.*$")
+_MAX_TITLE_LINES = 3
 
 
 def _norm_number(num: str, suffix: str | None) -> str:
@@ -125,13 +129,21 @@ def parse_articles(
     (renvoi au milieu d'une phrase) n'est PAS un debut d'article.
     """
     blocks: list[tuple[str, list[str]]] = []
+    skip_titles = 0          # lignes de titre à écarter après un "CHAPITRE IV" / "Section 2" seul sur sa ligne
     for line in text.splitlines():
         m = _ART_RE.match(line)
         if m:
+            skip_titles = 0
             number = _norm_number(m.group(1), m.group(2))
             rest = (m.group("rest") or "").lstrip(" .-–—:)").strip()
             blocks.append((number, [rest] if rest else []))
-        elif _HEADING_RE.match(line):
+        elif _HEADING_ALONE_RE.match(line):
+            skip_titles = _MAX_TITLE_LINES
+        elif _HEADING_INLINE_RE.match(line):
+            skip_titles = 0
+        elif skip_titles and line.strip():
+            skip_titles -= 1           # titre du chapitre ou de la section : ne fait pas partie de l'article précédent
+        elif skip_titles:
             continue
         elif blocks:
             blocks[-1][1].append(line.rstrip())

@@ -449,7 +449,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Veille juridique : met à jour le corpus de lois et l'index.")
     ap.add_argument("--config", default="configs/law_sources.yaml")
     ap.add_argument("--corpus-dir", default="data/corpus")
-    ap.add_argument("--dense", action="store_true", help="encodeur E5 multilingue (sinon BM25 seul)")
+    ap.add_argument("--dense", action="store_true", help="encodeur dense (sinon BM25 seul)")
+    ap.add_argument("--model", default="BAAI/bge-m3", help="encodeur dense retenu : BGE-M3")
     ap.add_argument("--no-mlflow", action="store_true")
     ap.add_argument("--loop", type=int, default=0, metavar="SECONDES",
                     help="repasse toutes les N secondes (en production : cron ou tâche planifiée Kubeflow)")
@@ -466,7 +467,7 @@ def main() -> None:
     if args.dense:
         from .index import SentenceTransformerEmbedder
 
-        embedder = SentenceTransformerEmbedder()
+        embedder = SentenceTransformerEmbedder(args.model)
     index = HybridIndex(embedder, cache_path=store.root / "embeddings.npz")
     watcher = Watcher(load_sources(root / args.config), store, root=root, index=index)
 

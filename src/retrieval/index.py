@@ -46,6 +46,8 @@ def tokenize(text: str) -> list[str]:
 
 
 class Embedder(Protocol):
+    name: str
+
     def embed_passages(self, texts: list[str]) -> np.ndarray: ...
     def embed_queries(self, texts: list[str]) -> np.ndarray: ...
 
@@ -56,6 +58,7 @@ class SentenceTransformerEmbedder:
     def __init__(self, model_name: str = "intfloat/multilingual-e5-base"):
         from sentence_transformers import SentenceTransformer  # import tardif : lourd
 
+        self.name = model_name
         self.model = SentenceTransformer(model_name)
         self.model.max_seq_length = min(self.model.max_seq_length or 512, 512)   # BGE-M3 accepte 8192 : inutile ici
         # E5 exige les préfixes "query: " / "passage: " ; BGE-M3 et la plupart des autres n'en veulent pas.
@@ -81,6 +84,7 @@ class HashingEmbedder:
 
     def __init__(self, dim: int = 512):
         self.dim = dim
+        self.name = f"hashing-{dim}"
 
     def _vec(self, text: str) -> np.ndarray:
         v = np.zeros(self.dim, dtype=np.float32)
@@ -148,7 +152,9 @@ class HybridIndex:
         live = sorted((a for a in articles.values() if a.status == "in_force"), key=lambda a: a.article_id)
         self._articles = live
         texts = [doc_text(a) for a in live]
-        keys = [hashlib.sha256(t.encode("utf-8")).hexdigest() for t in texts]
+        # La clé inclut le nom du modèle : deux encodeurs différents ne doivent jamais partager un vecteur.
+        ename = getattr(self.embedder, "name", "sans-encodeur")
+        keys = [hashlib.sha256(f"{ename}|{t}".encode("utf-8")).hexdigest() for t in texts]
 
         tokens = [tokenize(t) for t in texts]
         self._bm25 = BM25Okapi(tokens) if any(tokens) else None

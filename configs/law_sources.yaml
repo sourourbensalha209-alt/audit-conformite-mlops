@@ -37,11 +37,13 @@ sources:
     jurisdiction: TN
     aliases: ["2004-63"]
 
-  - id: tn-coc
-    title: "Code des obligations et des contrats (COC)"
-    kind: file
-    path: data/corpus_raw/tn_coc_fr.txt
-    jurisdiction: TN
+  # Code des obligations et des contrats : à décommenter quand le texte est enregistré
+  # (python scripts/pdf_to_txt.py data/corpus_raw/tn_coc_fr.pdf data/corpus_raw/tn_coc_fr.txt)
+  # - id: tn-coc
+  #   title: "Code des obligations et des contrats (COC)"
+  #   kind: file
+  #   path: data/corpus_raw/tn_coc_fr.txt
+  #   jurisdiction: TN
 
   # Dépôt manuel : un juriste (ou la démonstration) dépose un texte nouveau ici, un fichier .txt par texte.
   # En-tête optionnel en tête de fichier :

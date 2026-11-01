@@ -269,3 +269,60 @@ def test_evaluation_recherche_de_regle(book):
     hybrid = build_rule_index(book, HashingEmbedder())
     assert evaluate(hybrid, clauses, truth, "hybrid")["recall@5"] == 1.0
     assert len(rules_to_articles(book)) == 41
+
+
+def test_cache_embeddings_separe_par_modele(tmp_path):
+    """Deux encodeurs différents sur le même cache ne doivent jamais se partager un vecteur."""
+    def encodeur(nom):
+        e = HashingEmbedder()
+        e.name = nom
+        return e
+
+    arts = {a.article_id: a for a in parse_articles(LOI_V1, "x", "Loi")}
+    cache = tmp_path / "emb.npz"
+    assert HybridIndex(encodeur("modele-A"), cache_path=cache).refresh(arts) == 5
+    assert HybridIndex(encodeur("modele-A"), cache_path=cache).refresh(arts) == 0   # même modèle : cache réutilisé
+    assert HybridIndex(encodeur("modele-B"), cache_path=cache).refresh(arts) == 5   # autre modèle : tout recalculé
+
+
+def test_titres_de_chapitre_ne_polluent_pas_l_article_precedent():
+    texte = """Article 23
+Limitations
+1. Le droit de l'Union peut limiter la portée des obligations.
+CHAPITRE IV
+Responsable du traitement et sous-traitant
+Section 1
+Obligations générales
+Article 24
+Responsabilité du responsable du traitement
+1. Le responsable met en œuvre des mesures appropriées.
+Section 2 du présent chapitre : cette ligne est du texte, pas un titre.
+Chapitre V : Des sanctions
+Article 25
+Protection dès la conception
+Le responsable agit.
+"""
+    arts = {a.number: a.text for a in parse_articles(texte, "x", "Loi")}
+    assert "Responsable du traitement et sous-traitant" not in arts["23"]     # titre de chapitre écarté
+    assert "Obligations générales" not in arts["23"]                          # titre de section écarté
+    assert arts["23"].endswith("obligations.")                               # le vrai texte est intact
+    assert "Section 2 du présent chapitre" in arts["24"]                      # une phrase n'est pas un titre
+    assert "Des sanctions" not in arts["24"]                                  # titre sur une seule ligne écarté
+    assert arts["25"].startswith("Protection dès la conception")             # le titre propre de l'article reste
+
+
+def test_nettoyage_pdf_retire_l_entete_mais_jamais_le_corps():
+    from src.retrieval.textclean import strip_page_noise
+
+    pages = []
+    for p in range(1, 7):                      # 6 pages : même bandeau en haut, corps TRÈS répétitif
+        pages.append([f"Page {p} sur 6", "Base de données", "LA LEGISLATION DU SECTEUR DE LA SECURITE",
+                      f"Art. {p} :", "Le texte de l'article impose des obligations précises au responsable.",
+                      "a) premier point de l'article", "b) second point de l'article",
+                      "Le responsable informe la personne concernée.", "Il tient un registre à jour.", str(p)])
+    kept, dropped, found = strip_page_noise(pages)
+    texte = "\n".join(kept)
+    assert "LEGISLATION DU SECTEUR" not in texte and "Base de données" not in texte   # bandeau retiré
+    assert texte.count("Le texte de l'article impose") == 6                            # corps intact, même répété
+    assert texte.count("a) premier point") == 6
+    assert any("LEGISLATION" in n for n, _ in found)                                   # et signalé à l'utilisateur
