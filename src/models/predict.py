@@ -37,6 +37,12 @@ class ClauseClassifier:
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
         model_dir = Path(model_dir)
+        if not (model_dir / "model.safetensors").exists():
+            hint = ""
+            if (model_dir / "model_2.safetensors").exists():
+                hint = (f"\nLe fichier s'appelle model_2.safetensors : renommez-le en model.safetensors "
+                        f"(Rename-Item \"{model_dir / 'model_2.safetensors'}\" model.safetensors).")
+            raise FileNotFoundError(f"model.safetensors introuvable dans {model_dir}.{hint}")
         self.labels: list[str] = json.loads((model_dir / "labels.json").read_text(encoding="utf-8"))
         self.threshold = threshold
         self.max_length = max_length            # 256 : valeur d'entraînement (metrics.json)
