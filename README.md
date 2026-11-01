@@ -32,7 +32,9 @@ Contrat PDF / DOCX
 [3] Classification du type de clause          <-- terminé (Legal-BERT, F1 macro 0.719)
       |
       v
-[4] Recherche de l'article de loi (RAG)
+[4] Recherche de la règle et de l'article de loi (RAG)   <-- mesuré (BGE-M3, Recall@5 0.787)
+      ^
+      |  veille juridique : les nouvelles lois entrent dans le corpus sans réentraînement
       |
       v
 [5] Jugement de conformité (LLM)
@@ -114,12 +116,81 @@ dépasse la baseline sur toutes les métriques. Sur les catégories rares seules
 **Modèle retenu pour le pipeline : Legal-BERT, itération 2.** Il est versionné
 avec DVC dans `models/best_model_v2`.
 
-### Reproduire
+---
+
+## Résultats : recherche de la règle
+
+Un référentiel de **41 règles contractuelles** (une par catégorie du classifieur) est
+indexé avec le corpus de lois. Pour chaque clause de test, la bonne règle est celle de sa
+catégorie CUAD : la vérité terrain ne demande aucune annotation supplémentaire.
+1 912 clauses de test, tracées dans MLflow (expérience `02-recherche-regles`).
+
+| Méthode | Recall@1 | Recall@3 | Recall@5 | MRR |
+| --- | --- | --- | --- | --- |
+| BM25 (référence classique) | 0,358 | 0,595 | 0,684 | 0,481 |
+| E5 multilingue, dense | 0,379 | 0,634 | 0,730 | 0,513 |
+| E5 multilingue, hybride | 0,411 | 0,658 | 0,765 | 0,547 |
+| **BGE-M3, dense** | **0,463** | 0,700 | **0,787** | 0,584 |
+| BGE-M3, hybride | 0,458 | **0,703** | 0,785 | **0,586** |
+
+**BGE-M3 retenu** : +10 points de Recall@5 sur BM25. L'hybride n'apporte rien de plus avec
+BGE-M3 (écart de l'ordre du bruit sur 1 912 clauses), il aide en revanche avec E5.
+
+Dans la chaîne, la règle d'une clause est prise directement par sa catégorie (Legal-BERT,
+accuracy 0,79). La recherche sert à retrouver les **articles de loi** (RGPD, droit tunisien)
+et de solution de repli quand le classifieur n'est pas sûr.
+
+---
+
+## Veille juridique : les nouvelles lois sont prises en compte automatiquement
+
+Une nouvelle loi ne demande **aucun réentraînement** : la connaissance juridique vit dans le
+corpus et l'index de recherche, pas dans les poids des modèles. Legal-BERT classe le *type*
+de clause, qui ne change pas quand la loi change.
+
+À chaque passage, `src/retrieval/law_watch.py` :
+
+1. relit les sources de `configs/law_sources.yaml` (RGPD, loi 2004-63, dossier de dépôt, Journal officiel) ;
+2. découpe les textes par article et compare leur empreinte à celle déjà connue ;
+3. note ce qui est **ajouté, modifié ou abrogé** dans un journal (l'ancienne version est conservée) ;
+4. repère les textes du type « loi n° X modifiant la loi n° Y » et marque la loi visée **« à vérifier »** ;
+5. ne ré-encode que les articles nouveaux ou modifiés, puis rafraîchit l'index ;
+6. trace le passage dans MLflow, avec une **version du corpus** à inscrire dans chaque rapport d'audit.
+
+**Limites assumées.** Une loi modificative est détectée et signalée, pas fusionnée avec la loi
+d'origine : la consolidation exacte est un travail de juriste. Les textes captés
+automatiquement entrent comme « non validés ». La récupération depuis le Journal officiel
+(JORT) reste à configurer et à tester sur le site réel.
+
+Démonstration (loi fictive) : `python scripts/demo_veille.py`
+
+---
+
+## Limites connues
+
+- Contrats en anglais et droit américain (CUAD) ; ouverture au français et au droit tunisien prévue.
+- Les 41 règles sont des **bonnes pratiques contractuelles**, pas des articles de loi : elles
+  sont à valider par un juriste (`validated: false` dans `data/rules/rules_contractuelles.json`).
+- CUAD n'a pas de catégorie « données personnelles » ni « sous-traitance » : ces clauses sont
+  repérées par mots-clés, puis rapprochées du RGPD par la recherche.
+- Jeu de données de taille modeste pour le deep learning (10 134 clauses, catégories rares
+  sous 20 exemples) : compensé par un modèle pré-entraîné sur des textes juridiques et une
+  perte pondérée.
+
+---
+
+## Reproduire
 
 - Baseline : `python -m src.models.classify_baseline`
 - Itération 1 : `notebooks/benchmark_transformers_colab_v2.ipynb` (Google Colab, GPU T4)
 - Itération 2 : `notebooks/iteration2_colab.ipynb` (Google Colab, GPU T4)
 - Import des résultats Colab dans MLflow : `python -m src.models.log_benchmark reports/benchmark_v2.json`
+- Règles : `python scripts/build_rules.py`
+- Recherche, BM25 : `python -m src.retrieval.eval_retrieval`
+- Recherche, embeddings : `notebooks/retrieval_dense_colab.ipynb` (Colab, GPU T4), puis
+  `python -m src.retrieval.eval_retrieval --log-only reports/retrieval_bge_m3.json`
+- Veille juridique : `python -m src.retrieval.law_watch`
+- Tests : `python -m pytest tests/test_law_watch.py -v`
 
 ---
 
@@ -129,9 +200,11 @@ avec DVC dans `models/best_model_v2`.
 | --- | --- |
 | GitHub | Versionnement du code, historique des contributions |
 | DVC | Versionnement des données et des modèles |
-| MLflow | Suivi des expériences, comparaison des modèles |
+| MLflow | Suivi des expériences, comparaison des modèles et des méthodes de recherche |
 | Hugging Face Transformers | Fine-tuning de BERT, Legal-BERT, DeBERTa |
-| Google Colab (GPU T4) | Entraînement des Transformers |
+| sentence-transformers | Encodeurs E5 multilingue et BGE-M3 |
+| rank-bm25 | Recherche lexicale de référence (BM25) |
+| Google Colab (GPU T4) | Entraînement des Transformers, mesure des encodeurs |
 | scikit-learn | Baseline TF-IDF + SVM, métriques |
 | FastAPI, Docker | Service d'audit (en cours) |
 
@@ -162,14 +235,18 @@ mlflow ui --port 5000          # http://localhost:5000
 
 ```
 .
-├── data/            # données, gérées par DVC (non versionnées par Git)
+├── configs/         # sources de la veille juridique
+├── data/
+│   ├── rules/       # référentiel de 41 règles + 9 contrôles RGPD
+│   └── ...          # données, gérées par DVC (non versionnées par Git)
 ├── models/          # modèles entraînés, gérés par DVC
-├── notebooks/       # notebooks d'entraînement Colab
+├── notebooks/       # notebooks Colab (entraînement, mesure de la recherche)
 ├── reports/         # métriques, tableaux et graphiques des expériences
+├── scripts/         # génération des règles, démonstration, préparation Colab
 ├── src/
 │   ├── data/        # téléchargement et préparation des données
-│   ├── models/      # classification des clauses
-│   ├── retrieval/   # recherche d'articles (RAG)
+│   ├── models/      # classification des clauses (entraînement, inférence)
+│   ├── retrieval/   # corpus de lois, index, veille juridique, évaluation
 │   ├── judge/       # jugement de conformité
 │   └── api/         # service FastAPI
 ├── tests/
@@ -186,8 +263,8 @@ mlflow ui --port 5000          # http://localhost:5000
 | --- | --- | --- |
 | 1. Fondations | Dépôt, DVC, MLflow, données CUAD | Terminé |
 | 2. Classification | 7 modèles comparés, Legal-BERT retenu | Terminé |
-| 3. Corpus de lois | RGPD et loi tunisienne, article par article | À faire |
-| 4. Recherche d'articles | BM25, recherche dense, hybride | À faire |
+| 3. Référentiel et corpus de lois | 41 règles + 9 contrôles RGPD faits ; textes du RGPD et de la loi 2004-63 à charger | En cours |
+| 4. Recherche et veille juridique | BM25, E5, BGE-M3 mesurés (BGE-M3 retenu) ; veille automatique des nouvelles lois | Terminé, hors indexation des lois réelles |
 | 5. Jugement | LLM qui évalue la conformité et cite l'article | À faire |
 | 6. Big Data | Kafka, Spark, data lake | À faire |
 | 7. Produit | API, interface web, Docker | À faire |
@@ -200,7 +277,5 @@ mlflow ui --port 5000          # http://localhost:5000
 
 | Membre | Rôle |
 | --- | --- |
-| À compléter | À compléter |
-| À compléter | À compléter |
-| À compléter | À compléter |
-| À compléter | À compléter |
+| Sourour BEN SALHA | À compléter |
+| Ghayth AOUISSAOUI | À compléter |
