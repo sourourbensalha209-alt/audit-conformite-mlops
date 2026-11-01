@@ -1,0 +1,85 @@
+# Sources surveillées par la veille juridique (python -m src.retrieval.law_watch).
+#
+# kind :
+#   rules         le référentiel de règles contractuelles (JSON)
+#   file          un texte consolidé enregistré en local ; un article qui disparaît = abrogé
+#   url           idem, téléchargé depuis une adresse (voir la note sur EUR-Lex)
+#   inbox         dossier de textes nouveaux déposés à la main (un .txt par texte)
+#   jort_listing  page qui liste les derniers textes publiés ; les nouveautés pertinentes sont ingérées
+#
+# Les textes lus doivent contenir des lignes du type "Article 5", "Article 5 - ...", "Art. 2. - ...",
+# "Article premier". Si le texte téléchargé est formaté autrement, la veille le dit (erreur explicite)
+# et ne modifie rien.
+
+sources:
+  - id: rules
+    title: Référentiel de règles contractuelles
+    kind: rules
+    path: data/rules/rules_contractuelles.json
+    jurisdiction: playbook
+
+  # RGPD (UE) 2016/679, version française.
+  # EUR-Lex bloque parfois les téléchargements automatiques : dans ce cas, enregistrez le texte une
+  # fois à la main dans data/corpus_raw/rgpd_fr.txt et gardez "kind: file". La veille détecte ensuite
+  # tout changement du fichier. Pour un suivi réellement automatique : "kind: url" + l'adresse EUR-Lex
+  # du règlement (numéro CELEX 32016R0679).
+  - id: rgpd
+    title: "Règlement (UE) 2016/679 (RGPD)"
+    kind: file
+    path: data/corpus_raw/rgpd_fr.txt
+    jurisdiction: EU
+    aliases: ["2016-679"]
+
+  - id: tn-2004-63
+    title: "Loi organique n° 2004-63 du 27 juillet 2004, portant sur la protection des données à caractère personnel"
+    kind: file
+    path: data/corpus_raw/tn_2004_63_fr.txt
+    jurisdiction: TN
+    aliases: ["2004-63"]
+
+  - id: tn-coc
+    title: "Code des obligations et des contrats (COC)"
+    kind: file
+    path: data/corpus_raw/tn_coc_fr.txt
+    jurisdiction: TN
+
+  # Dépôt manuel : un juriste (ou la démonstration) dépose un texte nouveau ici, un fichier .txt par texte.
+  # En-tête optionnel en tête de fichier :
+  #   # id: tn-loi-2026-12
+  #   # title: Loi n° 2026-12 du ... portant modification de la loi n° 2004-63 ...
+  #   # publication_date: 2026-09-30
+  - id: inbox
+    title: Textes déposés manuellement
+    kind: inbox
+    path: data/law_inbox
+    jurisdiction: TN
+    auto_validate: false          # entre dans l'index, mais signalé "non validé" dans les rapports
+
+  # Surveillance du Journal officiel (JORT, Imprimerie officielle : www.iort.gov.tn).
+  # Le site est la source officielle (édition électronique) ; aucun flux RSS repéré, donc interrogation
+  # régulière de la page des derniers textes.
+  # >>> À AJUSTER : ouvrir le site, repérer la page qui liste les derniers numéros/textes, coller son
+  # >>> adresse dans "url" et adapter "link_pattern" (expression régulière appliquée aux adresses des liens).
+  # Désactivé tant que l'adresse n'est pas vérifiée : décommenter ensuite.
+  # - id: jort
+  #   title: Journal officiel de la République tunisienne
+  #   kind: jort_listing
+  #   url: "https://www.iort.gov.tn/"
+  #   link_pattern: ".*"
+  #   jurisdiction: TN
+  #   auto_validate: false
+  #   min_score: 2
+  #   keywords:
+  #     - contrat
+  #     - obligations
+  #     - données à caractère personnel
+  #     - protection des données
+  #     - concurrence
+  #     - consommation
+  #     - propriété intellectuelle
+  #     - droit d'auteur
+  #     - commerce électronique
+  #     - signature électronique
+  #     - société commerciale
+  #     - assurance
+  #     - arbitrage
