@@ -59,9 +59,10 @@ def validate_against_labels(book: RuleBook, labels: list[str]) -> dict[str, list
     """Vérifie que chaque catégorie du classifieur a exactement une règle (et inversement)."""
     cats = [r["category"] for r in book.rules]
     labels = [l for l in labels if l != NEUTRAL_LABEL]      # la classe "Autre" n'a pas de règle : c'est voulu
+    identity = {"Document Name", "Parties", "Agreement Date", "Effective Date"}   # trouvées par l'extracteur, pas par le classifieur
     return {
         "sans_regle": sorted(set(labels) - set(cats)),
-        "regle_orpheline": sorted(set(cats) - set(labels)),
+        "regle_orpheline": sorted(set(cats) - set(labels) - identity),
         "doublons": sorted({c for c in cats if cats.count(c) > 1}),
     }
 

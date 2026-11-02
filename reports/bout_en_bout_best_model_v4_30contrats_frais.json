@@ -1,0 +1,265 @@
+{
+  "modele": "best_model_v4",
+  "contrats": 30,
+  "jamais_utilises_pour_le_diagnostic": true,
+  "segments": 2646,
+  "mode": "hybride",
+  "tableau_seuils": [
+    {
+      "seuil": 0.0,
+      "rappel %": 81.9,
+      "fantômes %": 10.9,
+      "abstention %": 0.0,
+      "Autre %": 79.4,
+      "contrat-catégories annotées": 226,
+      "trouvés": 185
+    },
+    {
+      "seuil": 0.5,
+      "rappel %": 79.2,
+      "fantômes %": 9.5,
+      "abstention %": 1.8,
+      "Autre %": 79.4,
+      "contrat-catégories annotées": 226,
+      "trouvés": 179
+    },
+    {
+      "seuil": 0.7,
+      "rappel %": 71.7,
+      "fantômes %": 7.5,
+      "abstention %": 4.8,
+      "Autre %": 79.4,
+      "contrat-catégories annotées": 226,
+      "trouvés": 162
+    },
+    {
+      "seuil": 0.9,
+      "rappel %": 64.2,
+      "fantômes %": 5.0,
+      "abstention %": 8.0,
+      "Autre %": 79.4,
+      "contrat-catégories annotées": 226,
+      "trouvés": 145
+    }
+  ],
+  "reglages_autre": [
+    {
+      "règle": "argmax",
+      "seuil": 0.0,
+      "rappel %": 81.9,
+      "fantômes %": 10.9,
+      "abstention %": 0.0,
+      "Autre %": 79.4,
+      "contrat-catégories annotées": 226,
+      "trouvés": 185
+    },
+    {
+      "règle": "argmax",
+      "seuil": 0.5,
+      "rappel %": 79.2,
+      "fantômes %": 9.5,
+      "abstention %": 1.8,
+      "Autre %": 79.4,
+      "contrat-catégories annotées": 226,
+      "trouvés": 179
+    },
+    {
+      "règle": "0.7",
+      "seuil": 0.0,
+      "rappel %": 81.9,
+      "fantômes %": 13.2,
+      "abstention %": 0.0,
+      "Autre %": 77.4,
+      "contrat-catégories annotées": 226,
+      "trouvés": 185
+    },
+    {
+      "règle": "0.7",
+      "seuil": 0.5,
+      "rappel %": 79.6,
+      "fantômes %": 11.4,
+      "abstention %": 2.0,
+      "Autre %": 77.4,
+      "contrat-catégories annotées": 226,
+      "trouvés": 180
+    },
+    {
+      "règle": "0.9",
+      "seuil": 0.0,
+      "rappel %": 82.3,
+      "fantômes %": 16.6,
+      "abstention %": 0.0,
+      "Autre %": 74.2,
+      "contrat-catégories annotées": 226,
+      "trouvés": 186
+    },
+    {
+      "règle": "0.9",
+      "seuil": 0.5,
+      "rappel %": 80.1,
+      "fantômes %": 13.5,
+      "abstention %": 3.2,
+      "Autre %": 74.2,
+      "contrat-catégories annotées": 226,
+      "trouvés": 181
+    },
+    {
+      "règle": "0.97",
+      "seuil": 0.0,
+      "rappel %": 82.7,
+      "fantômes %": 19.6,
+      "abstention %": 0.0,
+      "Autre %": 71.4,
+      "contrat-catégories annotées": 226,
+      "trouvés": 187
+    },
+    {
+      "règle": "0.97",
+      "seuil": 0.5,
+      "rappel %": 80.5,
+      "fantômes %": 14.9,
+      "abstention %": 4.7,
+      "Autre %": 71.4,
+      "contrat-catégories annotées": 226,
+      "trouvés": 182
+    },
+    {
+      "règle": "0.99",
+      "seuil": 0.0,
+      "rappel %": 83.2,
+      "fantômes %": 25.9,
+      "abstention %": 0.0,
+      "Autre %": 65.6,
+      "contrat-catégories annotées": 226,
+      "trouvés": 188
+    },
+    {
+      "règle": "0.99",
+      "seuil": 0.5,
+      "rappel %": 81.0,
+      "fantômes %": 16.2,
+      "abstention %": 9.2,
+      "Autre %": 65.6,
+      "contrat-catégories annotées": 226,
+      "trouvés": 183
+    }
+  ],
+  "diagnostic": {
+    "par_longueur": [
+      {
+        "longueur": "0-250",
+        "segments avec clause": 63,
+        "bonne étiquette %": 79.4,
+        "classés Autre %": 14.3
+      },
+      {
+        "longueur": "250-500",
+        "segments avec clause": 149,
+        "bonne étiquette %": 85.9,
+        "classés Autre %": 9.4
+      },
+      {
+        "longueur": "500-800",
+        "segments avec clause": 90,
+        "bonne étiquette %": 88.9,
+        "classés Autre %": 7.8
+      },
+      {
+        "longueur": "800-+",
+        "segments avec clause": 19,
+        "bonne étiquette %": 84.2,
+        "classés Autre %": 0.0
+      }
+    ],
+    "en_tetes": {
+      "trouvés": 15,
+      "total": 23,
+      "rappel %": 65.2
+    },
+    "en_tetes_categories": [
+      "Expiration Date"
+    ],
+    "autres_categories": {
+      "trouvés": 170,
+      "total": 203,
+      "rappel %": 83.7
+    },
+    "pires": [
+      [
+        "Renewal Term",
+        3,
+        8
+      ],
+      [
+        "License Grant",
+        6,
+        12
+      ],
+      [
+        "Ip Ownership Assignment",
+        4,
+        7
+      ],
+      [
+        "Post-Termination Services",
+        3,
+        5
+      ],
+      [
+        "Expiration Date",
+        15,
+        23
+      ],
+      [
+        "Rofr/Rofo/Rofn",
+        2,
+        3
+      ],
+      [
+        "Uncapped Liability",
+        3,
+        4
+      ],
+      [
+        "Revenue/Profit Sharing",
+        10,
+        13
+      ]
+    ]
+  },
+  "critere": {
+    "rappel_min": 61.0,
+    "fantomes_max": 28.0,
+    "seuil": 0.5
+  },
+  "reglage_unique_fixe_d_avance": {
+    "règle": "argmax",
+    "seuil": 0.5,
+    "rappel %": 79.2,
+    "fantômes %": 9.5,
+    "abstention %": 1.8,
+    "Autre %": 79.4,
+    "contrat-catégories annotées": 226,
+    "trouvés": 179,
+    "atteint": true
+  },
+  "extracteur_identite": {
+    "Document Name": {
+      "trouves": 25,
+      "total": 30
+    },
+    "Parties": {
+      "trouves": 28,
+      "total": 30
+    },
+    "Agreement Date": {
+      "trouves": 20,
+      "total": 26
+    },
+    "Effective Date": {
+      "trouves": 9,
+      "total": 21
+    }
+  },
+  "rappel_d_ensemble_pct": 78.4
+}

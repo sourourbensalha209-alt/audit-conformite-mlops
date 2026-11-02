@@ -35,3 +35,5 @@ mlartifacts/
 .pytest_tmp/
 
 .pytest_tmp/
+
+reports/_cache_pipeline_*.json

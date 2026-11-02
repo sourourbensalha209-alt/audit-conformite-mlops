@@ -25,7 +25,8 @@ METRIC_KEYS = {"f1_macro", "f1_weighted", "accuracy", "f1_macro_rare",
                "train_minutes", "latency_ms_per_clause", "params_millions",
                "best_epoch", "epochs_run",
                "f1_macro_42_classes", "autre_rappel", "autre_precision",
-               "fantomes_classification", "clauses_classees_autre"}
+               "fantomes_classification", "clauses_classees_autre",
+               "f1_macro_segments", "accuracy_segments", "clauses_perdues_passages", "clauses_perdues_segments", "n_classes"}
 SKIP_KEYS = {"key", "label"}
 
 

@@ -54,3 +54,43 @@ def test_la_mesure_distingue_autre_d_un_fantome():
     assert r1["fantômes %"] == 100.0 and r1["Autre %"] == 0.0
     assert r2["fantômes %"] == 0.0 and r2["Autre %"] == round(100 * 2 / 3, 1)
     assert r1["rappel %"] == r2["rappel %"] == 100.0                 # la bonne clause est retrouvée dans les deux cas
+
+
+def test_regle_de_decision_sur_autre():
+    from src.data.autre import decide_with_autre
+
+    labels = ["Audit Rights", "Autre", "Governing Law"]
+    probs = [0.10, 0.60, 0.30]                       # « Autre » est la plus probable, mais pas écrasante
+    assert decide_with_autre(probs, labels, None) == ("Autre", 0.60)                 # comportement habituel : le plus probable
+    assert decide_with_autre(probs, labels, 0.5)[0] == "Autre"                       # le modèle en est sûr à 60 % >= 50 %
+    lab, conf = decide_with_autre(probs, labels, 0.9)                                # exigeons 90 % pour dire « Autre »
+    assert lab == "Governing Law" and abs(conf - 0.30 / 0.40) < 1e-9                 # meilleure catégorie, confiance entre catégories
+    assert decide_with_autre([0.01, 0.98, 0.01], labels, 0.9)[0] == "Autre"          # très sûr : « Autre » reste « Autre »
+
+
+def test_balayage_et_critere_fixe_d_avance():
+    from src.data.segment_eval import critere_atteint, sweep_autre
+
+    doc = fake_doc(0)
+    segs = segment(doc["text"])                       # NEUTRE_1, CLAUSE, NEUTRE_2
+    labels = ["Audit Rights", "Autre", "Governing Law"]
+    # la clause est jugée « Autre » à 70 % (le défaut qu'on veut corriger) ; les deux neutres, « Autre » à 99 %
+    probs = [[0.005, 0.99, 0.005], [0.05, 0.70, 0.25], [0.005, 0.99, 0.005]]
+    rows = sweep_autre([doc], [segs], [probs], labels, rules=(None, 0.9), thresholds=(0.5,))
+    par_regle = {r["règle"]: r for r in rows}
+    assert par_regle["argmax"]["rappel %"] == 0.0 and par_regle["argmax"]["fantômes %"] == 0.0     # clause perdue, aucun fantôme
+    assert par_regle["0.9"]["rappel %"] == 100.0 and par_regle["0.9"]["fantômes %"] == 0.0         # exiger 90 % la récupère
+    assert critere_atteint(rows) == ["0.9"]
+
+
+def test_diagnostic_par_longueur_et_par_categorie():
+    from src.data.segment_eval import diagnose
+
+    doc = fake_doc(0)
+    segs = segment(doc["text"])                              # NEUTRE_1, CLAUSE, NEUTRE_2
+    d1 = diagnose([doc], [segs], [[("Autre", 0.9), ("Autre", 0.8), ("Autre", 0.9)]])   # la clause est classée « Autre »
+    ligne = next(r for r in d1["par_longueur"] if r["segments avec clause"] == 1)
+    assert ligne["bonne étiquette %"] == 0.0 and ligne["classés Autre %"] == 100.0
+    assert d1["autres_categories"]["rappel %"] == 0.0
+    d2 = diagnose([doc], [segs], [[("Autre", 0.9), ("Governing Law", 0.8), ("Autre", 0.9)]])
+    assert d2["autres_categories"] == {"trouvés": 1, "total": 1, "rappel %": 100.0}

@@ -28,6 +28,7 @@ class Prediction:
     confidence: float
     top3: list[tuple[str, float]]
     abstain: bool           # confiance sous le seuil : la clause part en "à vérifier par un humain"
+    probs: list[float] | None = None    # probabilité de CHAQUE étiquette (même ordre que labels.json)
 
 
 class ClauseClassifier:
@@ -69,7 +70,7 @@ class ClauseClassifier:
             with torch.no_grad():
                 probs = torch.softmax(self.model(**enc).logits, dim=-1).cpu()
             top_p, top_i = probs.topk(3, dim=-1)
-            for p, ix in zip(top_p, top_i):
+            for row, p, ix in zip(probs, top_p, top_i):
                 top3 = [(self.labels[int(j)], float(v)) for v, j in zip(p, ix)]
-                out.append(Prediction(top3[0][0], top3[0][1], top3, top3[0][1] < self.threshold))
+                out.append(Prediction(top3[0][0], top3[0][1], top3, top3[0][1] < self.threshold, row.tolist()))
         return out
