@@ -1,0 +1,85 @@
+{
+  "modele": "best_model_v4",
+  "contrats": 30,
+  "tau": 0.5,
+  "criteres": {
+    "recall_min": 60.0,
+    "precision_min": 50.0
+  },
+  "par_categorie": [
+    {
+      "catégorie": "Agreement Date",
+      "tp": 1,
+      "fp": 2,
+      "fn": 3,
+      "tn": 24,
+      "absentes_en_vrai": 4,
+      "dit_manquante": 3
+    },
+    {
+      "catégorie": "Cap On Liability",
+      "tp": 18,
+      "fp": 0,
+      "fn": 2,
+      "tn": 10,
+      "absentes_en_vrai": 20,
+      "dit_manquante": 18
+    },
+    {
+      "catégorie": "Document Name",
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "tn": 30,
+      "absentes_en_vrai": 0,
+      "dit_manquante": 0
+    },
+    {
+      "catégorie": "Effective Date",
+      "tp": 4,
+      "fp": 9,
+      "fn": 5,
+      "tn": 12,
+      "absentes_en_vrai": 9,
+      "dit_manquante": 13
+    },
+    {
+      "catégorie": "Expiration Date",
+      "tp": 5,
+      "fp": 8,
+      "fn": 2,
+      "tn": 15,
+      "absentes_en_vrai": 7,
+      "dit_manquante": 13
+    },
+    {
+      "catégorie": "Governing Law",
+      "tp": 7,
+      "fp": 0,
+      "fn": 0,
+      "tn": 23,
+      "absentes_en_vrai": 7,
+      "dit_manquante": 7
+    },
+    {
+      "catégorie": "Parties",
+      "tp": 0,
+      "fp": 2,
+      "fn": 0,
+      "tn": 28,
+      "absentes_en_vrai": 0,
+      "dit_manquante": 2
+    }
+  ],
+  "total": {
+    "tp": 35,
+    "fp": 21,
+    "fn": 12,
+    "tn": 142
+  },
+  "precision_manquante_pct": 62.5,
+  "rappel_manquante_pct": 74.5,
+  "taux_de_base_pct": 22.4,
+  "couples": 210,
+  "critere_atteint": true
+}
