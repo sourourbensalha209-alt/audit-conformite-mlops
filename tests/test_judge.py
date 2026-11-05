@@ -185,3 +185,86 @@ def test_verdict_manquante():
     # absents en vrai : docs 2 et 4 ; dit « manquante » : docs 3 et 4 -> bien vu 1, à tort 1, raté 1
     assert r["total"] == {"tp": 1, "fp": 1, "fn": 1, "tn": 1} and r["precision_manquante_pct"] == 50.0 and r["rappel_manquante_pct"] == 50.0
     assert r["taux_de_base_pct"] == 50.0 and r["critere_atteint"] is False
+
+
+# --- lecture csv, fusion de copies, protection ----------------------------------------------------------------------
+def test_lecture_csv_exporte_d_excel(tmp_path):
+    from src.judge.sheet import read_sheet
+
+    contenu = ('id;famille;clause du contrat;verdict_sourour;verdict_ghayth;commentaire\r\n'
+               'J001;playbook;"Une clause\nsur deux lignes";conforme;;\r\n'
+               'J002;rgpd;Autre clause;;a_verifier;"ma fhemtch"\r\n')
+    f = tmp_path / "feuille.csv"
+    f.write_bytes(b"\xef\xbb\xbf" + contenu.encode("utf-8"))                 # UTF-8 avec BOM, séparateur ; (Excel en français)
+    rows = read_sheet(f)
+    assert [r["id"] for r in rows] == ["J001", "J002"]
+    assert rows[0]["verdict_sourour"] == "conforme" and rows[1]["verdict_ghayth"] == "a_verifier" and rows[1]["commentaire"] == "ma fhemtch"
+    g = tmp_path / "windows.csv"
+    g.write_bytes("id,verdict_sourour,verdict_ghayth,commentaire\nJ009,non_conforme,,é\n".encode("cp1252"))   # ancien encodage, séparateur ,
+    assert read_sheet(g)[0]["verdict_sourour"] == "non_conforme"
+
+
+def test_fusion_des_copies_de_chaque_annotatrice():
+    from src.judge.sheet import merge_sheets
+
+    copie_sourour = [{"id": "J1", "verdict_sourour": "conforme", "verdict_ghayth": "", "commentaire": ""},
+                     {"id": "J2", "verdict_sourour": "", "verdict_ghayth": "", "commentaire": ""}]
+    copie_ghayth = [{"id": "J1", "verdict_sourour": "", "verdict_ghayth": "non_conforme", "commentaire": "doute"},
+                    {"id": "J2", "verdict_sourour": "", "verdict_ghayth": "a_verifier", "commentaire": ""}]
+    m = {r["id"]: r for r in merge_sheets([copie_sourour, copie_ghayth])}
+    assert m["J1"]["verdict_sourour"] == "conforme" and m["J1"]["verdict_ghayth"] == "non_conforme" and m["J1"]["commentaire"] == "doute"
+    assert m["J2"]["verdict_ghayth"] == "a_verifier" and m["J2"]["verdict_sourour"] == ""
+
+
+def test_feuille_protegee_et_verdicts_repris(tmp_path, book):
+    openpyxl = pytest.importorskip("openpyxl")
+    from src.judge.sheet import read_sheet, write_sheet
+
+    cases, _ = build_cases(_docs(), book, {}, n_matched=12, n_rgpd=0, n_mismatch=2, n_neutral=2)
+    todo = [c for c in cases if c["a_annoter"]]
+    keep = {todo[0]["id"]: {"verdict_sourour": "conforme", "commentaire": "ok"}}
+    write_sheet(tmp_path / "propre.xlsx", cases, keep=keep)
+    ws = openpyxl.load_workbook(tmp_path / "propre.xlsx")["Cas"]
+    assert ws.protection.sheet is True
+    assert ws["F2"].protection.locked and ws["A2"].protection.locked and ws["D2"].protection.locked      # clause, id, règle : verrouillés
+    assert not ws["H2"].protection.locked and not ws["I2"].protection.locked and not ws["J2"].protection.locked   # cases jaunes : libres
+    rows = {r["id"]: r for r in read_sheet(tmp_path / "propre.xlsx")}
+    assert rows[todo[0]["id"]]["verdict_sourour"] == "conforme" and rows[todo[0]["id"]]["commentaire"] == "ok"
+    assert rows[todo[1]["id"]]["verdict_sourour"] == ""
+
+
+def test_regeneration_de_la_feuille_depuis_cases_jsonl(tmp_path, book):
+    """Le script refuse un cases.jsonl abîmé, mais accepte le fait normal que la famille « mismatch » réutilise des clauses."""
+    import subprocess
+    import sys
+
+    pytest.importorskip("openpyxl")
+    cases, _ = build_cases(_docs(), book, {}, n_matched=12, n_rgpd=0, n_mismatch=5, n_neutral=3)
+    assert len({c["clause"] for c in cases}) < len(cases)                    # des clauses sont réutilisées : normal
+    (tmp_path / "cases.jsonl").write_text("\n".join(json.dumps(c) for c in cases), encoding="utf-8")
+    out = subprocess.run([sys.executable, str(ROOT / "scripts" / "refresh_sheet.py"), "--cases", str(tmp_path / "cases.jsonl"),
+                          "--out", str(tmp_path / "propre.xlsx")], capture_output=True, text=True)
+    assert out.returncode == 0 and (tmp_path / "propre.xlsx").exists(), out.stdout + out.stderr
+    abime = [dict(c, clause="TOUJOURS LA MEME CLAUSE") for c in cases]                  # ce qui s'est passé dans Excel
+    (tmp_path / "abime.jsonl").write_text("\n".join(json.dumps(c) for c in abime), encoding="utf-8")
+    out = subprocess.run([sys.executable, str(ROOT / "scripts" / "refresh_sheet.py"), "--cases", str(tmp_path / "abime.jsonl"),
+                          "--out", str(tmp_path / "x.xlsx")], capture_output=True, text=True)
+    assert out.returncode != 0 and "abîmé" in (out.stdout + out.stderr)
+
+
+def test_feuille_reconstruite_depuis_un_csv_sans_fuite(tmp_path, book):
+    pytest.importorskip("openpyxl")
+    from src.judge.sheet import read_sheet, read_table, write_sheet, write_sheet_from_rows
+
+    cases, _ = build_cases(_docs(), book, {}, n_matched=12, n_rgpd=0, n_mismatch=2, n_neutral=2)
+    todo = [c for c in cases if c["a_annoter"]]
+    keep = {todo[0]["id"]: {"verdict_sourour": "conforme", "verdict_ghayth": "a_verifier"}}
+    write_sheet(tmp_path / "source.xlsx", cases, keep=keep)
+    table = read_table(tmp_path / "source.xlsx")                                  # texte complet des cas
+    assert len(table) == len(todo) and table[0]["clause du contrat"] == todo[0]["clause"]
+    write_sheet_from_rows(tmp_path / "pour_ghayth.xlsx", table, keep_columns=("verdict_ghayth",))
+    rows = {r["id"]: r for r in read_sheet(tmp_path / "pour_ghayth.xlsx")}
+    assert rows[todo[0]["id"]]["verdict_ghayth"] == "a_verifier" and rows[todo[0]["id"]]["verdict_sourour"] == ""   # rien de l'autre annotatrice
+    assert read_table(tmp_path / "pour_ghayth.xlsx")[1]["clause du contrat"] == todo[1]["clause"]                 # textes identiques
+    write_sheet_from_rows(tmp_path / "vierge.xlsx", table)
+    assert all(r["verdict_sourour"] == "" and r["verdict_ghayth"] == "" for r in read_sheet(tmp_path / "vierge.xlsx"))

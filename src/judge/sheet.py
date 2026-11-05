@@ -37,14 +37,38 @@ def assign(cases: list[dict], n_shared: int = 10) -> dict[str, str]:
     return out
 
 
-def write_sheet(path, cases: list[dict]) -> dict[str, str]:
+def write_sheet(path, cases: list[dict], keep: dict[str, dict] | None = None) -> dict[str, str]:
+    """keep : verdicts déjà donnés ({id: {verdict_sourour, verdict_ghayth, commentaire}}), repris dans la nouvelle feuille."""
+    who = assign(cases)
+    records = []
+    for c in (c for c in cases if c["a_annoter"]):
+        src = "\n".join(f"[{s['id']}] {s['citation']} : {' '.join(s['text'].split())[:350]}" for s in c["sources"]
+                        if s["id"] != c["rule"]["id"]) or "aucune"
+        old = (keep or {}).get(c["id"], {})
+        records.append([c["id"], c["family"], c["category"] or "", f"[{c['rule']['id']}] {c['rule']['titre']} : {c['rule']['regle']}",
+                        src, c["clause"], who[c["id"]], old.get("verdict_sourour") or None, old.get("verdict_ghayth") or None,
+                        old.get("commentaire") or None])
+    _build_workbook(path, records)
+    return who
+
+
+def write_sheet_from_rows(path, rows: list[dict], keep_columns: tuple[str, ...] = ()) -> None:
+    """Reconstruit une feuille propre et protégée à partir de lignes déjà lues (voir read_table), en reprenant le TEXTE des cas tel quel.
+    keep_columns : colonnes de verdicts à conserver (par exemple ("verdict_ghayth",) pour rendre à Ghayth ses réponses, sans rien de l'autre)."""
+    records = []
+    for r in rows:
+        vals = [r[c] for c in COLUMNS[:7]]
+        vals += [(r.get(c) or None) if c in keep_columns else None for c in COLUMNS[7:]]
+        records.append(vals)
+    _build_workbook(path, records)
+
+
+def _build_workbook(path, records: list[list]) -> None:
     from openpyxl import Workbook
     from openpyxl.worksheet.properties import PageSetupProperties
-    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Protection, Side
     from openpyxl.worksheet.datavalidation import DataValidation
 
-    who = assign(cases)
-    todo = [c for c in cases if c["a_annoter"]]
     wb = Workbook()
     arial = lambda **kw: Font(name="Arial", size=kw.pop("size", 10), **kw)
     yellow = PatternFill("solid", fgColor="FFFF99")
@@ -69,6 +93,7 @@ def write_sheet(path, cases: list[dict]) -> dict[str, str]:
         ("Qui remplit quoi", None, "sub"),
         ("Colonne G", "Chaque cas est attribué à Sourour, à Ghayth, ou aux DEUX (10 cas : ils servent à mesurer votre accord, remplissez-les chacun de votre côté, sans vous concerter).", None),
         ("Cellules jaunes", "Colonnes H (verdict_sourour), I (verdict_ghayth) et J (commentaire facultatif). Choisissez le verdict dans le menu déroulant. Ne modifiez aucune autre cellule.", None),
+        ("Feuille protégée", "Seules les cases jaunes sont modifiables : la clause, la règle et l'identifiant sont verrouillés, pour qu'un copier-coller ne les écrase pas. Pour traduire une clause, copiez-la ici (Ctrl+C) et collez-la dans Google Traduction, jamais dans ce fichier.", None),
         ("Règle d'or", "Ne regardez PAS les réponses du modèle avant d'avoir fini, et ne changez pas un verdict après coup.", None),
         ("Exemple (à ne pas recopier)", None, "sub"),
         ("Règle", "[R06] Plafonnement de la responsabilité : la responsabilité de chaque partie est plafonnée ; le plafond s'applique aux deux parties ; les exceptions sont listées.", None),
@@ -91,7 +116,7 @@ def write_sheet(path, cases: list[dict]) -> dict[str, str]:
             ws.cell(r, 1).alignment = Alignment(vertical="top")
             ws.row_dimensions[r].height = _height([v], [100], minimum=16)
         r += 1
-    n = len(todo)
+    n = len(records)
     last = n + 1
     for label, col in (("Cas remplis par Sourour", "H"), ("Cas remplis par Ghayth", "I")):
         ws.cell(r, 1, label).font = arial(bold=True)
@@ -111,11 +136,7 @@ def write_sheet(path, cases: list[dict]) -> dict[str, str]:
         c.fill = head
         c.alignment = Alignment(wrap_text=True, vertical="center")
         cs.column_dimensions[c.column_letter].width = w
-    for i, c in enumerate(todo, 2):
-        src = "\n".join(f"[{s['id']}] {s['citation']} : {' '.join(s['text'].split())[:350]}" for s in c["sources"]
-                        if s["id"] != c["rule"]["id"]) or "aucune"
-        vals = [c["id"], c["family"], c["category"] or "", f"[{c['rule']['id']}] {c['rule']['titre']} : {c['rule']['regle']}",
-                src, c["clause"], who[c["id"]], None, None, None]
+    for i, vals in enumerate(records, 2):
         for j, v in enumerate(vals, 1):
             cell = cs.cell(i, j, v)
             cell.font = arial()
@@ -123,12 +144,16 @@ def write_sheet(path, cases: list[dict]) -> dict[str, str]:
             cell.border = Border(top=thin, bottom=thin, left=thin, right=thin)
             if j in (8, 9, 10):
                 cell.fill = yellow
+                cell.protection = Protection(locked=False)       # seules les cases jaunes sont modifiables
         cs.row_dimensions[i].height = _height(vals, WIDTHS)
     dv = DataValidation(type="list", formula1='"' + ",".join(VERDICTS) + '"', allow_blank=True, showErrorMessage=True,
                         errorTitle="Verdict inconnu", error="Choisissez conforme, non_conforme ou a_verifier.")
     cs.add_data_validation(dv)
     dv.add(f"H2:I{last}")
     cs.freeze_panes = "B2"
+    cs.protection.sheet = True                                   # protège la clause, la règle, l'identifiant : pas de copier-coller par erreur
+    cs.protection.formatColumns = False                          # mais on peut toujours élargir une colonne ou régler la hauteur
+    cs.protection.formatRows = False
     for sheet in (ws, cs):                       # impression : paysage, une page de large
         sheet.page_setup.orientation = "landscape"
         sheet.page_setup.fitToWidth = 1
@@ -136,10 +161,54 @@ def write_sheet(path, cases: list[dict]) -> dict[str, str]:
         sheet.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
     cs.print_title_rows = "1:1"
     wb.save(path)
-    return who
+
+
+def read_table(path) -> list[dict]:
+    """Toutes les colonnes de la feuille « Cas » (.xlsx ou .csv), une ligne par cas."""
+    from pathlib import Path
+
+    path = Path(path)
+    if path.suffix.lower() == ".csv":
+        import csv
+        import io
+
+        raw = path.read_bytes()
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = raw.decode("cp1252")
+        first = text.split("\n", 1)[0]
+        delim = ";" if first.count(";") >= first.count(",") else ","
+        return [{k: (v or "") for k, v in r.items() if k} for r in csv.DictReader(io.StringIO(text, newline=""), delimiter=delim)
+                if (r.get("id") or "").strip()]
+    from openpyxl import load_workbook
+
+    ws = load_workbook(path, data_only=True)["Cas"]
+    head = [c.value for c in ws[1]]
+    return [{h: ("" if v is None else str(v)) for h, v in zip(head, row)} for row in ws.iter_rows(min_row=2, values_only=True) if row[0]]
 
 
 def read_sheet(path) -> list[dict]:
+    """Lit une feuille d'annotation : .xlsx, ou .csv exporté d'Excel (séparateur ; ou , ; encodage UTF-8 ou Windows)."""
+    from pathlib import Path
+
+    path = Path(path)
+    if path.suffix.lower() == ".csv":
+        import csv
+
+        raw = path.read_bytes()
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = raw.decode("cp1252")
+        delim = ";" if text.split("\n", 1)[0].count(";") >= text.split("\n", 1)[0].count(",") else ","
+        import io
+
+        rows = list(csv.DictReader(io.StringIO(text, newline=""), delimiter=delim))
+        return [{"id": (r.get("id") or "").strip(), "verdict_sourour": (r.get("verdict_sourour") or "").strip(),
+                 "verdict_ghayth": (r.get("verdict_ghayth") or "").strip(), "commentaire": r.get("commentaire") or ""}
+                for r in rows if (r.get("id") or "").strip()]
+
     from openpyxl import load_workbook
 
     ws = load_workbook(path, data_only=True)["Cas"]
@@ -148,7 +217,20 @@ def read_sheet(path) -> list[dict]:
     out = []
     for row in ws.iter_rows(min_row=2, values_only=True):
         if row[ix["id"]]:
-            out.append({"id": row[ix["id"]], "verdict_sourour": (row[ix["verdict_sourour"]] or "").strip(),
-                        "verdict_ghayth": (row[ix["verdict_ghayth"]] or "").strip(),
+            out.append({"id": row[ix["id"]], "verdict_sourour": str(row[ix["verdict_sourour"]] or "").strip(),
+                        "verdict_ghayth": str(row[ix["verdict_ghayth"]] or "").strip(),
                         "commentaire": row[ix["commentaire"]] or ""})
     return out
+
+
+def merge_sheets(sheets: list[list[dict]]) -> list[dict]:
+    """Fusionne plusieurs copies de la feuille (une par annotatrice) : pour chaque cas, on garde le premier verdict non vide
+    de chaque colonne. Chacune remplit SA colonne dans SA copie ; la fusion évite tout copier-coller entre fichiers."""
+    merged: dict[str, dict] = {}
+    for rows in sheets:
+        for r in rows:
+            m = merged.setdefault(r["id"], {"id": r["id"], "verdict_sourour": "", "verdict_ghayth": "", "commentaire": ""})
+            for k in ("verdict_sourour", "verdict_ghayth", "commentaire"):
+                if not m[k] and r.get(k):
+                    m[k] = r[k]
+    return list(merged.values())
