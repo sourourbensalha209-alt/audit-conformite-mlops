@@ -41,7 +41,7 @@ Contrat PDF / DOCX
       |  veille juridique : les nouvelles lois entrent dans le corpus sans réentraînement
       |
       v
-[5] Jugement de conformité (LLM)                                            à faire
+[5] Clauses manquantes (validé) + verdict conforme / non conforme (LLM ouvert : non validé)   évalué
       |
       v
 [6] Rapport d'audit  ->  [7] API + interface web + monitoring               à faire
@@ -227,6 +227,62 @@ Démonstration (loi fictive) : `python scripts/demo_veille.py`
 
 ---
 
+## Phase 5 : jugement de conformité
+
+CUAD ne contient aucun verdict de conformité : il n'existe pas de « bonne réponse » officielle. Les critères de réussite ont été
+écrits et versionnés **avant** toute mesure (`docs/criteres_phase5.md`) ; les annotations de référence ont été versionnées avant de lire
+la moindre réponse du modèle.
+
+### 1. Clauses manquantes (sans modèle de langage) : critère atteint
+
+Une catégorie attendue est « manquante » si aucun segment ne la reçoit (confiance 0,5) et si l'extracteur ne trouve rien. Mesuré sur
+les 30 contrats de confirmation, contre les annotations des juristes CUAD (`python scripts/eval_missing.py`) :
+
+| | Résultat | Repère |
+| --- | --- | --- |
+| Précision de « manquante » | **62,5 %** | 22,4 % si on disait toujours « manquante » (taux de base) |
+| Rappel de « manquante » | **74,5 %** | critère : 60 % et 50 % : atteint |
+
+Le résultat n'est pas uniforme : pour la responsabilité plafonnée (18 absences trouvées sur 20) et la loi applicable (7 sur 7), il n'y a
+**aucune fausse alerte** ; pour les dates et les parties, trouvées par l'extracteur, « manquante » est souvent faux (par exemple 4 bonnes
+détections sur 13 pour la date d'entrée en vigueur). Le rapport écrira donc « à vérifier » plutôt que « manquante » pour ces catégories.
+
+### 2. Verdict conforme / non conforme par un modèle ouvert : critères non atteints
+
+Deux modèles ouverts (Qwen2.5-1.5B et 3B, fp16, décodage glouton, sans réglage de la consigne) ont jugé 115 cas : 65 clauses réelles
+annotées par l'équipe, et 50 paires sans rapport (clause + règle étrangère, ou paragraphe neutre) dont le bon verdict est « à vérifier ».
+
+| Condition « avec règle » | JSON valide | Sources inventées | Abstention hors sujet | Accord équipe | Fausse abstention |
+| --- | --- | --- | --- | --- | --- |
+| Critère fixé d'avance | ≥ 95 % | ≤ 5 % | ≥ 70 % | ≥ 64 % | ≤ 30 % |
+| Qwen2.5-1.5B | 97,4 % | 0,0 % | **2,0 %** | **52,5 %** | 0,0 % |
+| Qwen2.5-3B | 100 % | 0,0 % | 100 % | **26,2 %** | **97,8 %** |
+
+Ce que répondent vraiment les modèles : le 1,5B dit « conforme » à 108 cas sur 115, y compris à des règles sans rapport avec la clause ;
+le 3B dit « à vérifier » à 114 cas sur 115. L'écart entre leur abstention sur les paires sans rapport et sur les paires liées est de
++2,0 et +1,5 points (mesure ajoutée après le premier essai) : **aucun des deux ne distingue** une clause qui concerne la règle d'une
+clause qui n'en parle pas. Fournir la règle ne change rien (accord de 52,5 % contre 54,1 % sans règle pour le 1,5B ; 26,2 % dans les
+deux cas pour le 3B). Le « 100 % d'abstention » du 3B n'est donc pas un succès : il s'abstient partout.
+
+**Décision.** Ces modèles ne sont pas retenus pour rendre un verdict. Le rapport d'audit fonctionne en **assistant de tri** : il signale
+les clauses manquantes là où c'est fiable, retrouve la règle de contrôle et l'article de loi applicables, et marque « à vérifier » ce qui
+demande un relecteur humain, sans verdict automatique « conforme / non conforme ».
+
+**Deux corrections de la mesure, faites après le premier essai et publiées avec lui** (commit `d54c907`) : (1) un modèle écrivait
+`["[]"]` pour dire « aucune source », ce que la première version du contrôle comptait comme une source inventée (3B : 71,3 % avant
+correction, 0,0 % après) ; (2) ajout de la mesure de discrimination. Les critères et les cas n'ont pas été modifiés.
+
+### Limites de cette évaluation
+
+- La référence est celle de deux étudiantes, pas de juristes : accord de 60 % sur 10 cas partagés (kappa 0,23), donc faible. Le seuil
+  d'accord retenu (64 %) dépassait cet accord humain : défaut du critère fixé d'avance, signalé ici.
+- Deux petits modèles, sans exemples dans la consigne et sans réglage : ce résultat n'exclut pas qu'un modèle plus gros ou une consigne
+  plus riche fasse mieux, il établit que ces deux-là ne suffisent pas.
+- Le corpus de lois ne contient que le RGPD et la loi tunisienne 2004-63 : seules les clauses sur les données personnelles peuvent citer
+  un article de loi.
+
+---
+
 ## Limites connues
 
 - Contrats en anglais et droit américain (CUAD) ; ouverture au français et au droit tunisien prévue.
@@ -238,6 +294,7 @@ Démonstration (loi fictive) : `python scripts/demo_veille.py`
   Ip Ownership Assignment (4 sur 7), Post-Termination Services (3 sur 5).
 - Date d'entrée en vigueur : extraction à améliorer (43 % sur l'échantillon de 30 contrats).
 - Le Journal officiel est alimenté par dépôt de PDF, non par interrogation automatique.
+- Le verdict « conforme / non conforme » n'est pas automatisé : les deux modèles ouverts testés ne distinguent pas les cas (voir « Phase 5 »).
 - Jeu de données modeste pour le deep learning (10 134 clauses, catégories rares sous 20 exemples) : compensé
   par un modèle pré-entraîné sur des textes juridiques et une perte pondérée.
 
@@ -256,7 +313,9 @@ Démonstration (loi fictive) : `python scripts/demo_veille.py`
 - Extraction d'identité : `python scripts/eval_header.py`
 - Découpage : `python scripts/eval_segmentation.py`
 - Essai de bout en bout : `python scripts/eval_pipeline.py --model models/best_model_v4 --contracts 30 --fresh --mlflow`
-- Tests : `python -m pytest tests/test_law_watch.py tests/test_segment.py tests/test_autre.py tests/test_header.py -q` (50 tests)
+- Clauses manquantes : `python scripts/eval_missing.py --model models/best_model_v4`
+- Cas du juge : `python scripts/build_judge_cases.py` ; modèles : `notebooks/judge_colab.ipynb` ; mesure : `python scripts/eval_judge.py --sheet data/judge/annotations_sourour.csv data/judge/annotations_ghayth.csv`
+- Tests : `python -m pytest tests/test_law_watch.py tests/test_segment.py tests/test_autre.py tests/test_header.py tests/test_judge.py -q` (69 tests)
 
 ---
 
@@ -334,7 +393,7 @@ mlflow ui --port 5000          # http://localhost:5000
 | 2 bis. Découpage | Découpage d'un contrat en clauses, 93 % des passages entiers | Terminé |
 | 3. Référentiel et corpus de lois | 41 règles sourcées sur CUAD, RGPD (99 articles), loi 2004-63 (105 articles) | Terminé |
 | 4. Recherche et veille juridique | BGE-M3 (Recall@5 0,787), mise à jour automatique des lois, dépôt de PDF du JORT | Terminé |
-| 5. Jugement | LLM qui évalue la conformité et cite l'article | À faire |
+| 5. Jugement | Clauses manquantes : critère atteint. Verdict conforme / non conforme par un modèle ouvert : évalué, critères non atteints, non retenu (assistant de tri) | Évalué |
 | 6. Big Data | Kafka, Spark, data lake | À faire |
 | 7. Produit | Lecture de PDF, rapport, API, interface web, Docker | À faire |
 | 8. MLOps avancé | Orchestration, CI/CD, monitoring | À faire |

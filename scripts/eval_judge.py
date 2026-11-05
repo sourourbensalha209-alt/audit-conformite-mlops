@@ -56,6 +56,13 @@ def main() -> None:
         print(f"{b['modele'].split('/')[-1]:26s} {b['condition']:13s} | {b['json_valide_pct']:>6} | {b['sources_inventees_pct']:>19} | "
               f"{b['accord_equipe_pct']:>15} | {b['reponse_majoritaire_pct']:>13} | {b['fausse_abstention_pct']:>14} | {ab:>18}")
 
+    print("\n=== Ce que répond vraiment chaque modèle (pour juger s'il distingue quelque chose) ===")
+    for b in blocks.values():
+        disc = "" if b["discrimination_pts"] is None else (f" | abstention hors-sujet - abstention sur paires liées = {b['discrimination_pts']:+.1f} pts "
+                                                            f"(proche de 0 : le modèle ne distingue pas)")
+        print(f"  {b['modele'].split('/')[-1]:24s} {b['condition']:13s} {b['repartition_verdicts']}{disc}")
+    print("  (le pouvoir de discrimination est une mesure ajoutée APRÈS le premier essai : ce n'est pas un critère fixé d'avance)")
+
     print("\n=== Critères fixés d'avance (condition « avec règle ») ===")
     verdicts = {}
     for key, b in blocks.items():
@@ -67,6 +74,14 @@ def main() -> None:
             print(f"    {'OK ' if ok else 'NON'}  {name:38s} {value if value is not None else '-':>6}  (exigé : {need})")
         verdicts[key] = all(ok for *_, ok in rows)
         print(f"    -> {'TOUS LES CRITÈRES ATTEINTS' if verdicts[key] else 'CRITÈRES NON TOUS ATTEINTS'}")
+
+    if agree.get("accord_brut_pct") is not None:
+        from src.judge.metrics import CRITERIA
+
+        maj = next((b["reponse_majoritaire_pct"] for b in blocks.values() if b["condition"] == "with_rule"), 0.0)
+        seuil = max(CRITERIA["accord_min"], maj + CRITERIA["accord_marge_majoritaire"])       # le seuil EFFECTIF, comme dans check_criteria
+        print(f"\n  Plafond de référence : vous deux ne vous accordez que dans {agree['accord_brut_pct']} % des cas partagés. "
+              f"Le seuil d'accord effectif ({seuil:.0f} %) est {'SUPÉRIEUR à' if seuil > agree['accord_brut_pct'] else 'compatible avec'} cet accord humain.")
 
     print("\n=== Apport de la règle fournie (même modèle, avec contre sans) ===")
     for key, b in blocks.items():
