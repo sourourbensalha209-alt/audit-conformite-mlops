@@ -81,6 +81,8 @@ def evaluate(cases: dict[str, dict], results: list[dict], labels: dict[str, str]
             invalid_cit += n_bad > 0
         unrel = [(c, p) for _, c, p in parsed if c["family"] in UNRELATED]
         lab = [(c, p, labels[c["id"]]) for _, c, p in parsed if c["family"] in LABELED and c["id"] in labels]
+        related = [(c, p) for _, c, p in parsed if c["family"] in LABELED]          # TOUTES les paires liées, annotées ou non
+        abst_related = pct(sum(p["verdict"] == "a_verifier" for _, p in related), len(related)) if related else None
         majority = Counter(l for _, _, l in lab).most_common(1)
         acc = pct(sum(p["verdict"] == l for _, p, l in lab), len(lab))
         trancher = [(p, l) for _, p, l in lab if l != "a_verifier"]
@@ -94,6 +96,11 @@ def evaluate(cases: dict[str, dict], results: list[dict], labels: dict[str, str]
             "sources_inventees_pct": pct(invalid_cit, n),
             "abstention_hors_sujet_pct": pct(sum(p["verdict"] == "a_verifier" for _, p in unrel), len(unrel)) if unrel else None,
             "cas_hors_sujet": len(unrel),
+            # Mesure ajoutée APRÈS le premier essai (pas un critère fixé d'avance) : un juge utile s'abstient sur les paires sans
+            # rapport mais PAS sur les paires liées. Un juge qui répond toujours pareil obtient un écart proche de 0.
+            "abstention_paires_liees_pct": abst_related,
+            "discrimination_pts": (round(pct(sum(p["verdict"] == "a_verifier" for _, p in unrel), len(unrel)) - abst_related, 1)
+                                   if unrel and abst_related is not None else None),
             "cas_annotes": len(lab),
             "accord_equipe_pct": acc,
             "reponse_majoritaire_pct": pct(majority[0][1], len(lab)) if majority else 0.0,

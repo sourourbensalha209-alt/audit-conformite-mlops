@@ -64,12 +64,28 @@ def _find_verdict(fragment: str) -> str | None:
     return None
 
 
+_NO_SOURCE = {"", "aucune", "aucun", "none", "null", "n/a", "na", "-", "rien"}
+
+
 def clean_source(s: str) -> str:
     return re.sub(r"^[\[\(\s]+|[\]\)\s]+$", "", s.strip())
 
 
 def check_citations(sources: list[str], allowed: list[str]) -> tuple[int, int]:
-    """(nombre de sources citées, nombre de sources qui ne figuraient PAS dans le prompt)."""
+    """(nombre de sources citées, nombre de sources qui ne figuraient PAS dans le prompt).
+
+    « [] », « aucune », une chaîne vide : le modèle dit qu'il ne cite rien, ce n'est pas une source (un petit modèle recopie
+    le « [] » de l'exemple de consigne ; le compter comme une source inventée était un défaut de cette mesure, corrigé après
+    le premier essai). « R38 : Responsabilité illimitée » est lu comme la source R38."""
     ok = {clean_source(a) for a in allowed}
-    cited = [clean_source(s) for s in sources if s.strip()]
+    cited = []
+    for s in sources:
+        c = clean_source(str(s))
+        if c.lower() in _NO_SOURCE:
+            continue
+        if c not in ok:
+            m = re.match(r"^([A-Za-z]+\d+)\b", c)           # "R38 : titre" -> "R38"
+            if m and m.group(1) in ok:
+                c = m.group(1)
+        cited.append(c)
     return len(cited), sum(c not in ok for c in cited)

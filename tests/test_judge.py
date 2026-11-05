@@ -268,3 +268,23 @@ def test_feuille_reconstruite_depuis_un_csv_sans_fuite(tmp_path, book):
     assert read_table(tmp_path / "pour_ghayth.xlsx")[1]["clause du contrat"] == todo[1]["clause"]                 # textes identiques
     write_sheet_from_rows(tmp_path / "vierge.xlsx", table)
     assert all(r["verdict_sourour"] == "" and r["verdict_ghayth"] == "" for r in read_sheet(tmp_path / "vierge.xlsx"))
+
+
+def test_aucune_source_n_est_pas_une_source_inventee():
+    """Un petit modèle écrit ["[]"] pour dire « aucune source » : ce n'est pas une citation inventée."""
+    assert check_citations(["[]"], ["R38"]) == (0, 0)
+    assert check_citations(["", "aucune", "None"], ["R38"]) == (0, 0)
+    assert check_citations(["R38 : Responsabilité illimitée"], ["R38"]) == (1, 0)             # forme « identifiant : titre »
+    assert check_citations(["R38", "R39"], ["R38"]) == (2, 1)                                    # R39 n'était pas dans le prompt : vraie invention
+    assert check_citations(["[]", "rgpd:99"], ["R38"]) == (1, 1)
+
+
+def test_pouvoir_de_discrimination():
+    cases = {c["id"]: c for c in [_case("a", "playbook"), _case("b", "playbook"), _case("c", "mismatch", "a_verifier"), _case("d", "neutral", "a_verifier")]}
+    constant = [{"case_id": k, "model": "m", "condition": "with_rule", "raw": _raw("a_verifier")} for k in cases]            # répond toujours pareil
+    assert evaluate(cases, constant, {})["m|with_rule"]["discrimination_pts"] == 0.0
+    bon = [{"case_id": "a", "model": "m", "condition": "with_rule", "raw": _raw("conforme", ["R06"])},
+           {"case_id": "b", "model": "m", "condition": "with_rule", "raw": _raw("non_conforme", ["R06"])},
+           {"case_id": "c", "model": "m", "condition": "with_rule", "raw": _raw("a_verifier")},
+           {"case_id": "d", "model": "m", "condition": "with_rule", "raw": _raw("a_verifier")}]
+    assert evaluate(cases, bon, {})["m|with_rule"]["discrimination_pts"] == 100.0                  # s'abstient sur le hors-sujet, jamais sur le lié
