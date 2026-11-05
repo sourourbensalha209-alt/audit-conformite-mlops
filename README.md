@@ -44,7 +44,10 @@ Contrat PDF / DOCX
 [5] Clauses manquantes (validé) + verdict conforme / non conforme (LLM ouvert : non validé)   évalué
       |
       v
-[6] Rapport d'audit  ->  [7] API + interface web + monitoring               à faire
+[6] Rapport d'audit (page HTML, scripts/audit_contract.py)                   fait
+      |
+      v
+[7] Lecture de PDF + API + interface web + monitoring                       à faire
       |
       v
    Correction par un juriste --> réentraînement
@@ -283,6 +286,16 @@ correction, 0,0 % après) ; (2) ajout de la mesure de discrimination. Les critè
 
 ---
 
+## Rapport d'audit d'un contrat
+
+`python scripts/audit_contract.py --cuad TUNIU` produit une page HTML autonome (sans serveur, sans internet) avec : l'identité du contrat
+(nom, parties, dates), les clauses attendues (présente, manquante ou à vérifier), et les clauses retrouvées avec leur règle de contrôle et
+les contrôles RGPD à vérifier. Le rapport ne rend aucun verdict « conforme / non conforme » (voir « Phase 5 ») : « manquante » n'est affirmé
+que pour la responsabilité plafonnée et la loi applicable, où la mesure n'a donné aucune fausse alerte ; pour les autres catégories, il écrit
+« à vérifier ». Pour les 30 contrats de confirmation, le rapport sort instantanément à partir des calculs enregistrés.
+
+---
+
 ## Limites connues
 
 - Contrats en anglais et droit américain (CUAD) ; ouverture au français et au droit tunisien prévue.
@@ -313,9 +326,10 @@ correction, 0,0 % après) ; (2) ajout de la mesure de discrimination. Les critè
 - Extraction d'identité : `python scripts/eval_header.py`
 - Découpage : `python scripts/eval_segmentation.py`
 - Essai de bout en bout : `python scripts/eval_pipeline.py --model models/best_model_v4 --contracts 30 --fresh --mlflow`
+- Rapport d'audit d'un contrat (page HTML) : `python scripts/audit_contract.py --list`, puis `python scripts/audit_contract.py --cuad TUNIU`
 - Clauses manquantes : `python scripts/eval_missing.py --model models/best_model_v4`
 - Cas du juge : `python scripts/build_judge_cases.py` ; modèles : `notebooks/judge_colab.ipynb` ; mesure : `python scripts/eval_judge.py --sheet data/judge/annotations_sourour.csv data/judge/annotations_ghayth.csv`
-- Tests : `python -m pytest tests/test_law_watch.py tests/test_segment.py tests/test_autre.py tests/test_header.py tests/test_judge.py -q` (69 tests)
+- Tests : `python -m pytest tests/test_law_watch.py tests/test_segment.py tests/test_autre.py tests/test_header.py tests/test_judge.py tests/test_report.py -q` (73 tests)
 
 ---
 
@@ -395,7 +409,7 @@ mlflow ui --port 5000          # http://localhost:5000
 | 4. Recherche et veille juridique | BGE-M3 (Recall@5 0,787), mise à jour automatique des lois, dépôt de PDF du JORT | Terminé |
 | 5. Jugement | Clauses manquantes : critère atteint. Verdict conforme / non conforme par un modèle ouvert : évalué, critères non atteints, non retenu (assistant de tri) | Évalué |
 | 6. Big Data | Kafka, Spark, data lake | À faire |
-| 7. Produit | Lecture de PDF, rapport, API, interface web, Docker | À faire |
+| 7. Produit | Rapport d'audit en page HTML : fait. Lecture de PDF, API, interface web, Docker : à faire | En cours |
 | 8. MLOps avancé | Orchestration, CI/CD, monitoring | À faire |
 | 9. Soutenance | Démo, rapport final | À faire |
 
