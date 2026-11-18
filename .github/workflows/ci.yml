@@ -1,6 +1,7 @@
-# Intégration continue : à chaque push et à chaque pull request, GitHub
+# CI/CD : à chaque push et à chaque pull request, GitHub
 #   1. lance tous les tests (pytest) ;
-#   2. construit l'image Docker du service d'audit et vérifie qu'elle démarre (API + interface).
+#   2. construit l'image Docker du service d'audit et vérifie qu'elle démarre (API + interface) ;
+#   3. (push seulement) publie l'image sur GitHub Container Registry : ghcr.io/<propriétaire>/<dépôt>.
 # Résultat visible dans l'onglet « Actions » du dépôt et sur le badge du README.
 
 name: CI
@@ -44,10 +45,13 @@ jobs:
         run: python -m pytest -v
 
   docker:
-    name: Image Docker (construction + démarrage)
+    name: Image Docker (construction + démarrage + publication)
     runs-on: ubuntu-latest
     needs: tests              # on ne construit l'image que si les tests passent
     timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write         # droit de publier l'image dans les « Packages » du dépôt
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
@@ -79,3 +83,41 @@ jobs:
       - name: Journal du conteneur (en cas d'échec)
         if: failure()
         run: docker logs audit || true
+
+      # ---- Livraison continue : l'image testée est publiée (pas pour les pull requests) ----
+      - name: Étiquettes de l'image
+        if: github.event_name != 'pull_request'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest
+            type=ref,event=branch
+            type=sha,prefix=sha-
+
+      - name: Connexion à GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publier l'image
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha          # couches déjà construites plus haut : quelques secondes
+
+      - name: Résumé
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "### Image publiée" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "docker pull ghcr.io/${{ github.repository }}:latest" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
