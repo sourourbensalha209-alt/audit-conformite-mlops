@@ -217,7 +217,7 @@ function renderClauses(query) {
     <div class="list-group-item py-3">
       <div class="d-flex justify-content-between align-items-center gap-3">
         <div class="fw-bold"><span class="badge bg-blue-lt me-2">§${c.n}</span>${esc(c.categorie)}</div>
-        ${confBar(c.confiance)}
+        ${c.confiance == null ? `<span class="small text-secondary">détectée par ${esc(c.source || "mots-clés")}</span>` : confBar(c.confiance)}
       </div>
       <div class="excerpt">${esc(cut(c.texte, 400))}</div>
       ${c.regle ? `<div class="small text-secondary mt-2"><b>Règle ${esc(c.regle.id)} — ${esc(c.regle.titre)}</b> : ${esc(cut(c.regle.regle, 260))}</div>` : ""}

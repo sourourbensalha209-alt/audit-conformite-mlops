@@ -26,6 +26,7 @@ TAU = 0.5
 # Pour les autres (dates, parties, durée), « non trouvée » est souvent faux : le rapport écrit « à vérifier ».
 RELIABLE_MISSING = {"Cap On Liability", "Governing Law"}
 GRAVITE = {"high": "élevée", "medium": "moyenne", "low": "faible"}
+PERSONAL_DATA_LABEL = "Données personnelles"   # paragraphe sans catégorie CUAD, retenu pour le seul contrôle RGPD
 
 
 def analyse(text: str, labels: list[str], probs_by_segment: list[list[float]], book, tau: float = TAU) -> dict:
@@ -37,15 +38,21 @@ def analyse(text: str, labels: list[str], probs_by_segment: list[list[float]], b
     for n, (seg, p) in enumerate(zip(segs, probs_by_segment), 1):
         i = max(range(len(p)), key=p.__getitem__)
         label, conf = labels[i], p[i]
-        if label == NEUTRAL_LABEL or conf < tau:
-            continue
-        rule = rule_for(book, label)
-        item = {"n": n, "categorie": label, "confiance": conf, "texte": seg.text,
-                "regle": ({"id": rule["id"], "titre": rule["titre"], "regle": rule["regle"], "gravite": rule["gravite"]} if rule else None),
-                "rgpd": None}
+        rgpd = None
         if checks and is_personal_data_clause(seg.text):
             chk = _pick_check(seg.text, checks)
-            item["rgpd"] = {"id": chk["id"], "theme": chk["theme"], "regle": chk["regle"], "refs": chk["refs"]}
+            rgpd = {"id": chk["id"], "theme": chk["theme"], "regle": chk["regle"], "refs": chk["refs"]}
+        if label == NEUTRAL_LABEL or conf < tau:
+            # Le classifieur n'a pas de catégorie CUAD pour ce paragraphe (CUAD n'en a pas pour les données personnelles).
+            # Le contrôle RGPD, fait par mots-clés, s'applique quand même : sinon une clause RGPD explicite passerait inaperçue.
+            if rgpd:
+                found_segments.append({"n": n, "categorie": PERSONAL_DATA_LABEL, "confiance": None, "source": "mots-clés RGPD",
+                                       "texte": seg.text, "regle": None, "rgpd": rgpd})
+            continue
+        rule = rule_for(book, label)
+        item = {"n": n, "categorie": label, "confiance": conf, "source": "classifieur", "texte": seg.text,
+                "regle": ({"id": rule["id"], "titre": rule["titre"], "regle": rule["regle"], "gravite": rule["gravite"]} if rule else None),
+                "rgpd": rgpd}
         found_segments.append(item)
         if label not in best or conf > best[label]["confiance"]:
             best[label] = item
@@ -71,8 +78,8 @@ def analyse(text: str, labels: list[str], probs_by_segment: list[list[float]], b
     attendues.sort(key=lambda a: (order[a["statut"]], a["categorie"]))
 
     return {"identite": identite, "attendues": attendues, "clauses": found_segments,
-            "stats": {"segments": len(segs), "clauses": len(found_segments),
-                      "categories": len({c["categorie"] for c in found_segments}),
+            "stats": {"segments": len(segs), "clauses": sum(1 for c in found_segments if c["confiance"] is not None),
+                      "categories": len({c["categorie"] for c in found_segments if c["confiance"] is not None}),
                       "rgpd": sum(1 for c in found_segments if c["rgpd"])}}
 
 
@@ -138,7 +145,7 @@ def render_body(a: dict) -> str:
                 if c["regle"] else "<span class='small'>Pas de règle associée.</span>")
         rgpd = (f"<div class='small' style='margin-top:6px'><span class='badge warn'>RGPD</span> Contrôle {_e(c['rgpd']['id'])} · "
                 f"{_e(c['rgpd']['theme'])} — {_e(', '.join(c['rgpd']['refs']))}. <b>À vérifier par un humain.</b></div>" if c["rgpd"] else "")
-        rows_cl += (f"<tr><td>{c['n']}</td><td><b>{_e(c['categorie'])}</b><div class='small'>confiance {c['confiance']:.2f}</div></td>"
+        rows_cl += (f"<tr><td>{c['n']}</td><td><b>{_e(c['categorie'])}</b><div class='small'>{f"confiance {c['confiance']:.2f}" if c['confiance'] is not None else _e(c.get('source', ''))}</div></td>"
                     f"<td class='excerpt'>{_e(_cut(c['texte'], 330))}</td><td>{rule}{rgpd}</td></tr>")
     return f"""<div class="note"><b>Aperçu technique, pas un avis juridique.</b> Ce rapport ne rend aucun verdict « conforme / non conforme » : les modèles
 de langage ouverts testés ne distinguent pas ces cas (voir README, Phase 5). Il signale ce qui est mesuré comme fiable et marque

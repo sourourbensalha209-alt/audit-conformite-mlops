@@ -79,3 +79,16 @@ def test_interface_a_plusieurs_contrats(book):
     assert page.count("</script>") == 1                                                            # le contenu des contrats ne ferme pas la balise script
     assert "http://" not in page and "https://" not in page                                         # aucune ressource externe : marche hors ligne
     assert "Contrat <A>" not in page.split("const DATA")[0]                                         # le titre n'est pas injecté tel quel dans la page
+
+
+def test_clause_rgpd_signalee_meme_sans_categorie_cuad(book):
+    """CUAD n'a pas de catégorie « données personnelles » : une clause RGPD classée « Autre » doit quand même être contrôlée."""
+    texte = ("This Agreement shall be governed by the laws of Tunisia, without regard to conflicts of law principles.\n\n"
+             "Each party shall process personal data only for the purposes of this Agreement and in accordance with "
+             "applicable data protection laws, and shall notify the other party of any breach without undue delay.")
+    a = analyse(texte, LABELS, _probs("Governing Law", "Autre"), book)
+    rgpd = [c for c in a["clauses"] if c["rgpd"]]
+    assert len(rgpd) == 1 and rgpd[0]["confiance"] is None and rgpd[0]["source"] == "mots-clés RGPD"
+    assert a["stats"]["rgpd"] == 1
+    assert a["stats"]["clauses"] == 1                       # seules les clauses du classifieur sont comptées comme « reconnues »
+    assert "mots-clés RGPD" in render_html(a, build_meta("t", "m", "v"))
