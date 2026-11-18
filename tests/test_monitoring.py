@@ -41,13 +41,17 @@ def test_alertes_de_derive_et_de_service(tmp_path):
 
 def test_taux_de_correction(tmp_path):
     log, fb = tmp_path / "audits.jsonl", tmp_path / "corrections.jsonl"
-    for j in ("a", "b"):
+    for j in ("a", "b", "c", "d"):
         m.record({"job_id": j, "statut": "termine", "duree_s": 5, "part_autre": 0.8, "part_abstention": 0.0}, log)
     m.record({"job_id": "a", "verdict_corrige": "presente"}, fb)
     m.record({"job_id": "a", "verdict_corrige": "manquante"}, fb)    # deux corrections, un seul audit corrigé
     s = m.summary(log, fb)
-    assert s["indicateurs"]["corrections"] == 2 and s["indicateurs"]["taux_correction"] == 0.5
-    assert any(a["niveau"] == "qualite" for a in s["alertes"])
+    assert s["indicateurs"]["corrections"] == 2 and s["indicateurs"]["taux_correction"] == 0.25
+    assert s["alertes"] == []                                         # 4 audits : trop peu pour juger
+    m.record({"job_id": "e", "statut": "termine", "duree_s": 5, "part_autre": 0.8, "part_abstention": 0.0}, log)
+    m.record({"job_id": "b", "verdict_corrige": "presente"}, fb)
+    s = m.summary(log, fb)                                            # 5 audits, 2 corrigés : 40 % > 30 %
+    assert s["indicateurs"]["taux_correction"] == 0.4 and any(a["niveau"] == "qualite" for a in s["alertes"])
 
 
 def test_ligne_tronquee_ignoree(tmp_path):

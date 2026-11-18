@@ -46,8 +46,13 @@ def test_derive_sans_exemple_ne_suffit_pas():
 
 
 def test_derive_avec_exemples_declenche():
-    d = T.decide(3, [{"niveau": "qualite", "message": "40 % des audits corrigés"}], seuil=20)
+    d = T.decide(5, [{"niveau": "qualite", "message": "40 % des audits corrigés"}], seuil=20)
     assert d["reentrainer"] is True and any("Monitoring" in r for r in d["raisons"])
+
+
+def test_alerte_avec_un_seul_exemple_ne_suffit_pas():
+    d = T.decide(1, [{"niveau": "qualite", "message": "50 % des audits corrigés"}], seuil=20)
+    assert d["reentrainer"] is False and "au moins 5" in d["conseil"]
 
 
 def test_alerte_de_service_ne_declenche_pas():

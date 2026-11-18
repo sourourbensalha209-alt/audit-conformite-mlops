@@ -30,6 +30,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FEEDBACK_FILE = ROOT / "data" / "feedback" / "corrections.jsonl"
 WORK_DIR = ROOT / "data" / "feedback" / "reentrainement"
 SEUIL_EXEMPLES = 20        # nouveaux exemples nécessaires pour justifier un réentraînement
+MIN_EXEMPLES_ALERTE = 5    # sur alerte du monitoring, il faut quand même quelques exemples à apprendre
 MIN_CHARS = 25             # même minimum qu'un segment (src/data/segment.py)
 
 
@@ -82,10 +83,11 @@ def decide(n_nouveaux: int, alertes: list[dict], seuil: int = SEUIL_EXEMPLES, fo
             raisons.append(f"Monitoring : {a['message']}")
     if force:
         raisons.append("Lancement forcé.")
-    if raisons and n_nouveaux == 0 and not force:
-        # une dérive sans exemple corrigé : on alerte, mais il n'y a rien de nouveau à apprendre
+    if raisons and not force and n_nouveaux < min(seuil, MIN_EXEMPLES_ALERTE):
+        # une alerte sans assez d'exemples corrigés : on la signale, mais il n'y a pas de quoi apprendre
         return {"reentrainer": False, "raisons": raisons,
-                "conseil": "Faire corriger quelques audits récents par un juriste pour obtenir des exemples."}
+                "conseil": f"Faire corriger quelques audits récents par un juriste : au moins {MIN_EXEMPLES_ALERTE} "
+                           f"exemples sont nécessaires (actuellement {n_nouveaux})."}
     return {"reentrainer": bool(raisons), "raisons": raisons or ["Aucun déclencheur : le modèle actuel est conservé."]}
 
 

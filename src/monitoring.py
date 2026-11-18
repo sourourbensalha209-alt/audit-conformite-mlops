@@ -40,7 +40,7 @@ SEUILS = {                             # au-delà : alerte
     "taux_correction_max": 0.30,       # plus de 30 % des audits corrigés par un juriste
 }
 FENETRE = 20                           # les alertes portent sur les 20 derniers audits
-MIN_AUDITS_DERIVE = 5                  # une dérive se juge sur plusieurs audits, jamais sur un seul contrat
+MIN_AUDITS_DERIVE = 5                  # dérive et taux de correction se jugent sur plusieurs audits, jamais sur un seul
 
 _lock = threading.Lock()
 
@@ -123,7 +123,7 @@ def summary(log_path: Path | None = None, feedback_path: Path | None = None) -> 
         alertes.append({"niveau": "service", "message": f"{i['taux_erreur']:.0%} des derniers audits ont échoué."})
     if i["duree_moyenne_s"] is not None and i["duree_moyenne_s"] > SEUILS["duree_max_s"]:
         alertes.append({"niveau": "service", "message": f"Durée moyenne {i['duree_moyenne_s']:.0f} s : service lent."})
-    if i["taux_correction"] is not None and i["taux_correction"] > SEUILS["taux_correction_max"]:
+    if len(ok) >= MIN_AUDITS_DERIVE and i["taux_correction"] is not None and i["taux_correction"] > SEUILS["taux_correction_max"]:
         alertes.append({"niveau": "qualite", "message":
                         f"{i['taux_correction']:.0%} des audits corrigés par un juriste : envisager un réentraînement."})
 
