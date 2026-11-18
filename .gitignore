@@ -12,6 +12,9 @@ venv/
 *.pdf
 *.zip
 
+# Corrections des juristes (donnees produites par l'application)
+/data/feedback
+
 # MLflow
 mlruns/
 mlartifacts/

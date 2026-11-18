@@ -1,4 +1,4 @@
-.PHONY: install data pipeline api mlflow test lint clean
+.PHONY: install data pipeline api mlflow test lint clean docker docker-stop
 
 install:
 	pip install -r requirements.txt
@@ -20,3 +20,9 @@ test:
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +
+
+docker:
+	docker compose up --build -d
+
+docker-stop:
+	docker compose down

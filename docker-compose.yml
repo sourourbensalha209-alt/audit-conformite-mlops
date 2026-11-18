@@ -1,7 +1,27 @@
+# Lancement de tout le projet :   docker compose up --build
+#   Interface + API : http://localhost:8000
+#   MLflow          : http://localhost:5000
+
 services:
+
+  api:
+    build: .
+    image: audit-conformite:latest
+    container_name: audit-api
+    ports:
+      - "8000:8000"
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./models:/app/models:ro                 # modèle Legal-BERT v4 (récupéré avec dvc pull), lecture seule
+      - ./data/feedback:/app/data/feedback      # corrections des juristes : gardées sur le disque, hors du conteneur
+    depends_on:
+      - mlflow
+    restart: unless-stopped
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.17.2
+    container_name: audit-mlflow
     command: >
       mlflow server
       --host 0.0.0.0
@@ -12,17 +32,7 @@ services:
       - "5000:5000"
     volumes:
       - mlflow_data:/mlflow
-
-  api:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      MLFLOW_TRACKING_URI: http://mlflow:5000
-    depends_on:
-      - mlflow
-    volumes:
-      - ./data:/app/data
+    restart: unless-stopped
 
 volumes:
   mlflow_data:
