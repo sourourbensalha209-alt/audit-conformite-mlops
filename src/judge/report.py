@@ -110,6 +110,13 @@ footer{font-size:12.5px;color:#4a5568;margin:34px 0 20px}
 """
 
 
+def _conf_label(c: dict) -> str:
+    """« confiance 0.93 » pour le classifieur ; la source sinon (ex. « mots-clés RGPD »)."""
+    if c["confiance"] is not None:
+        return "confiance {:.2f}".format(c["confiance"])
+    return _e(c.get("source", ""))
+
+
 def _e(s) -> str:
     return html.escape(str(s))
 
@@ -145,7 +152,7 @@ def render_body(a: dict) -> str:
                 if c["regle"] else "<span class='small'>Pas de règle associée.</span>")
         rgpd = (f"<div class='small' style='margin-top:6px'><span class='badge warn'>RGPD</span> Contrôle {_e(c['rgpd']['id'])} · "
                 f"{_e(c['rgpd']['theme'])} — {_e(', '.join(c['rgpd']['refs']))}. <b>À vérifier par un humain.</b></div>" if c["rgpd"] else "")
-        rows_cl += (f"<tr><td>{c['n']}</td><td><b>{_e(c['categorie'])}</b><div class='small'>{f"confiance {c['confiance']:.2f}" if c['confiance'] is not None else _e(c.get('source', ''))}</div></td>"
+        rows_cl += (f"<tr><td>{c['n']}</td><td><b>{_e(c['categorie'])}</b><div class='small'>{_conf_label(c)}</div></td>"
                     f"<td class='excerpt'>{_e(_cut(c['texte'], 330))}</td><td>{rule}{rgpd}</td></tr>")
     return f"""<div class="note"><b>Aperçu technique, pas un avis juridique.</b> Ce rapport ne rend aucun verdict « conforme / non conforme » : les modèles
 de langage ouverts testés ne distinguent pas ces cas (voir README, Phase 5). Il signale ce qui est mesuré comme fiable et marque
