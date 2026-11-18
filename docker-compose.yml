@@ -15,6 +15,7 @@ services:
     volumes:
       - ./models:/app/models:ro                 # modèle Legal-BERT v4 (récupéré avec dvc pull), lecture seule
       - ./data/feedback:/app/data/feedback      # corrections des juristes : gardées sur le disque, hors du conteneur
+      - ./data/monitoring:/app/data/monitoring  # journal du monitoring (un audit par ligne)
     depends_on:
       - mlflow
     restart: unless-stopped

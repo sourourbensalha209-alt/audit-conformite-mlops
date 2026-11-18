@@ -21,6 +21,7 @@ data/processed
 data/judge
 data/corpus_raw
 data/feedback
+data/monitoring
 *.pdf
 *.zip
 .env

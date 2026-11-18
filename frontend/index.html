@@ -30,6 +30,11 @@
           <span class="nav-link-icon"><svg class="icon"><use href="vendor/icons.svg#i-file-upload"/></svg></span>
           <span class="nav-link-title">Nouvel audit</span>
         </a>
+        <a class="nav-link" href="#" id="nav-monitoring">
+          <span class="nav-link-icon"><svg class="icon"><use href="vendor/icons.svg#i-activity"/></svg></span>
+          <span class="nav-link-title">Monitoring</span>
+          <span class="badge bg-red ms-auto" id="nav-alerts" hidden></span>
+        </a>
       </div>
 
       <div class="sidebar-section">
@@ -118,6 +123,59 @@
                 <div>Le système ne rend <b>aucun verdict « conforme » automatique</b> : il repère, classe et signale.
                   La décision revient au juriste, qui peut corriger chaque résultat.</div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Monitoring -->
+        <div id="view-monitoring" hidden>
+          <div class="row row-deck row-cards mb-3">
+            <div class="col-sm-6 col-lg-3"><div class="card card-sm"><div class="card-body">
+              <div class="subheader">Audits</div>
+              <div class="h1 mb-0" id="mon-audits">–</div>
+              <div class="text-secondary small" id="mon-audits-detail"></div>
+            </div></div></div>
+            <div class="col-sm-6 col-lg-3"><div class="card card-sm"><div class="card-body">
+              <div class="subheader">Durée moyenne</div>
+              <div class="h1 mb-0" id="mon-duree">–</div>
+              <div class="text-secondary small">sur les derniers audits</div>
+            </div></div></div>
+            <div class="col-sm-6 col-lg-3"><div class="card card-sm"><div class="card-body">
+              <div class="subheader">Confiance du modèle</div>
+              <div class="h1 mb-0" id="mon-confiance">–</div>
+              <div class="text-secondary small" id="mon-abstention"></div>
+            </div></div></div>
+            <div class="col-sm-6 col-lg-3"><div class="card card-sm"><div class="card-body">
+              <div class="subheader">Corrections des juristes</div>
+              <div class="h1 mb-0" id="mon-corrections">–</div>
+              <div class="text-secondary small" id="mon-taux-correction"></div>
+            </div></div></div>
+          </div>
+
+          <div class="card mb-3">
+            <div class="card-header"><h3 class="card-title">Alertes</h3></div>
+            <div class="list-group list-group-flush" id="mon-alertes"></div>
+          </div>
+
+          <div class="row row-cards mb-3">
+            <div class="col-lg-6"><div class="card"><div class="card-header">
+              <h3 class="card-title">Dérive : part des paragraphes « Autre »</h3></div>
+              <div class="card-body"><div id="chart-autre" class="chart"></div>
+              <div class="text-secondary small mt-2" id="ref-autre"></div></div></div></div>
+            <div class="col-lg-6"><div class="card"><div class="card-header">
+              <h3 class="card-title">Durée de chaque audit (s)</h3></div>
+              <div class="card-body"><div id="chart-duree" class="chart"></div>
+              <div class="text-secondary small mt-2">Une hausse signale un service surchargé ou des documents plus longs.</div></div></div></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h3 class="card-title">Derniers audits</h3>
+              <div class="card-actions"><a href="/metrics" target="_blank" class="btn btn-sm btn-outline-secondary">Format Prometheus ↗</a></div></div>
+            <div class="table-responsive">
+              <table class="table table-vcenter card-table">
+                <thead><tr><th>Date</th><th>Document</th><th>Statut</th><th>Durée</th><th>Paragraphes</th><th>Confiance</th><th>« Autre »</th></tr></thead>
+                <tbody id="mon-table"></tbody>
+              </table>
             </div>
           </div>
         </div>

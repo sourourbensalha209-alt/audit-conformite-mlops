@@ -23,6 +23,7 @@ FAUX_RESULTAT = {
 def client(monkeypatch, tmp_path):
     monkeypatch.setattr(pipeline, "audit_file", lambda path, title: (FAUX_RESULTAT, "<html>rapport</html>"))
     monkeypatch.setattr(api, "FEEDBACK_FILE", tmp_path / "corrections.jsonl")
+    monkeypatch.setattr(api.monitoring, "LOG_FILE", tmp_path / "audits.jsonl")
     api.JOBS.clear()
     api.REPORTS.clear()
     return TestClient(api.app)
@@ -67,3 +68,11 @@ def test_interface_servie(client):
     if not api.FRONTEND_DIR.exists():
         pytest.skip("dossier frontend absent")
     assert "Agent d'audit" in client.get("/app/").text
+
+
+def test_monitoring_apres_un_audit(client):
+    client.post("/audit", files={"file": ("c.txt", b"texte")})
+    m = client.get("/monitoring").json()
+    assert m["indicateurs"]["audits"] == 1 and m["indicateurs"]["termines"] == 1
+    metrics = client.get("/metrics").text
+    assert 'audit_total{statut="termine"} 1' in metrics

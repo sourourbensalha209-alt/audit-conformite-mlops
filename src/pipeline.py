@@ -15,6 +15,7 @@ from pathlib import Path
 
 from src.data.segment import segment
 from src.judge.report import analyse, build_meta, render_html
+from src.monitoring import model_stats
 from src.retrieval.rules import load_rules
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -65,6 +66,7 @@ def audit_text(text: str, title: str) -> tuple[dict, str]:
     labels = json.loads((MODEL_DIR / "labels.json").read_text(encoding="utf-8"))
     probs = [p.probs for p in _classifier().predict([s.text for s in segs])]
     result = analyse(text, labels, probs, _rules())
+    result["monitoring"] = model_stats(probs, labels)       # indicateurs suivis par src/monitoring.py
     html = render_html(result, build_meta(title, MODEL_DIR.name, _corpus_version()))
     return result, html
 

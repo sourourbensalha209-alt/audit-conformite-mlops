@@ -4,6 +4,7 @@
 //   GET  /audit/{id}/rapport page HTML du rapport
 //   GET  /audits            historique
 //   POST /feedback          correction d'un juriste
+//   GET  /monitoring        indicateurs du service et du modèle, alertes de dérive
 // Aucune bibliothèque externe : JavaScript standard.
 
 const API = "";                      // même serveur que l'interface
@@ -41,10 +42,12 @@ function toast(msg) {
 }
 
 function show(view) {
-  for (const v of ["welcome", "progress", "error", "result"]) $(`view-${v}`).hidden = v !== view;
+  for (const v of ["welcome", "progress", "error", "result", "monitoring"]) $(`view-${v}`).hidden = v !== view;
   $("btn-report").hidden = view !== "result";
   $("nav-new").classList.toggle("active", view === "welcome");
+  $("nav-monitoring").classList.toggle("active", view === "monitoring");
   if (view === "welcome") $("page-title").textContent = "Nouvel audit";
+  if (view === "monitoring") $("page-title").textContent = "Monitoring du service et du modèle";
 }
 
 function badge(statut, texte) {
@@ -139,7 +142,7 @@ async function poll() {
     $("page-title").textContent = job.document;
     if (job.status === "en_attente") setStep(1, "Lecture du document…");
     else if (job.status === "en_cours") setStep(2, "Classification des clauses par Legal-BERT… (plus long au premier audit : chargement du modèle)");
-    else if (job.status === "termine") { setStep(4); renderResult(job); loadHistory(); return; }
+    else if (job.status === "termine") { setStep(4); renderResult(job); loadHistory(); loadMonitoring(); return; }
     else if (job.status === "erreur") { showError(job.erreur || "Erreur inconnue"); loadHistory(); return; }
     pollTimer = setTimeout(poll, POLL_MS);
   } catch (err) {
@@ -271,6 +274,77 @@ async function loadHistory() {
   } catch (_) { /* service injoignable : déjà signalé dans le menu */ }
 }
 
+// ---------- Monitoring ----------
+
+const pct = (v) => (v == null ? "–" : `${Math.round(v * 100)} %`);
+
+function lineChart(el, values, { min = 0, max = null, ref = null, band = null, bad = () => false, fmt = (v) => v } = {}) {
+  const pts = values.map((v, i) => [i, v]).filter(([, v]) => v != null);
+  if (!pts.length) { el.innerHTML = `<div class="text-secondary small">Pas encore de données : lancez un audit.</div>`; return; }
+  const W = 600, H = 180, L = 40, R = 10, T = 10, B = 22;
+  const hi = max ?? (Math.max(...pts.map(([, v]) => v), ref ?? 0) * 1.15 || 1);
+  const x = (i) => L + (values.length === 1 ? (W - L - R) / 2 : (i * (W - L - R)) / (values.length - 1));
+  const y = (v) => T + (H - T - B) * (1 - (v - min) / (hi - min));
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">`;
+  if (band) svg += `<rect class="band" x="${L}" width="${W - L - R}" y="${y(band[1])}" height="${y(band[0]) - y(band[1])}"/>`;
+  svg += `<line class="axis" x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}"/>`;
+  svg += `<text x="${L - 6}" y="${y(hi) + 4}" text-anchor="end">${fmt(hi)}</text><text x="${L - 6}" y="${H - B}" text-anchor="end">${fmt(min)}</text>`;
+  if (ref != null) svg += `<line class="ref" x1="${L}" x2="${W - R}" y1="${y(ref)}" y2="${y(ref)}"/><text x="${W - R}" y="${y(ref) - 4}" text-anchor="end">référence ${fmt(ref)}</text>`;
+  if (pts.length > 1) svg += `<polyline class="line" points="${pts.map(([i, v]) => `${x(i)},${y(v)}`).join(" ")}"/>`;
+  svg += pts.map(([i, v]) => `<circle class="dot ${bad(v) ? "bad" : ""}" cx="${x(i)}" cy="${y(v)}" r="4"><title>${fmt(v)}</title></circle>`).join("");
+  el.innerHTML = svg + "</svg>";
+}
+
+function renderMonitoring(m) {
+  const i = m.indicateurs;
+  $("mon-audits").textContent = i.audits;
+  $("mon-audits-detail").textContent = `${i.termines} terminés · ${i.erreurs} en erreur`;
+  $("mon-duree").textContent = i.duree_moyenne_s == null ? "–" : `${i.duree_moyenne_s.toFixed(1)} s`;
+  $("mon-confiance").textContent = pct(i.confiance_moyenne);
+  $("mon-abstention").textContent = `${pct(i.part_abstention)} de paragraphes incertains (réf. ${pct(m.reference.part_abstention)})`;
+  $("mon-corrections").textContent = i.corrections;
+  $("mon-taux-correction").textContent = i.taux_correction == null ? "aucun audit terminé" : `${pct(i.taux_correction)} des audits corrigés`;
+
+  $("mon-alertes").innerHTML = m.alertes.length
+    ? m.alertes.map((a) => `<div class="list-group-item d-flex gap-2 align-items-start">
+        <span class="badge ${a.niveau === "service" ? "bg-red-lt" : a.niveau === "derive" ? "bg-yellow-lt" : "bg-purple-lt"}">${
+          { service: "Service", derive: "Dérive", qualite: "Qualité" }[a.niveau] || a.niveau}</span>
+        <span>${esc(a.message)}</span></div>`).join("")
+    : m.derive.evaluable
+      ? `<div class="list-group-item text-success">${ICON("circle-check")} Aucune alerte : le service répond et les contrats ressemblent à ceux de l'entraînement
+        (fenêtre : ${m.fenetre} derniers audits).</div>`
+      : `<div class="list-group-item text-secondary">${ICON("info-circle")} Aucune alerte de service. La dérive des données se juge sur plusieurs audits :
+        elle sera évaluée à partir de ${m.derive.minimum} audits (actuellement ${m.derive.audits}).</div>`;
+
+  const ok = m.serie.filter((a) => a.statut === "termine");
+  const refA = m.reference.part_autre, ecart = m.seuils.ecart_part_autre;
+  lineChart($("chart-autre"), ok.map((a) => a.part_autre), {
+    max: 1, ref: refA, band: [Math.max(0, refA - ecart), Math.min(1, refA + ecart)], fmt: pct,
+    bad: (v) => Math.abs(v - refA) > ecart,
+  });
+  $("ref-autre").textContent = `Zone verte : ${pct(refA - ecart)} à ${pct(refA + ecart)} (référence mesurée sur 30 contrats jamais vus). Un point rouge = contrat atypique.`;
+  lineChart($("chart-duree"), m.serie.map((a) => a.duree_s), { fmt: (v) => Math.round(v), bad: (v) => v > m.seuils.duree_max_s });
+
+  $("mon-table").innerHTML = m.serie.slice().reverse().slice(0, 15).map((a) => `<tr>
+      <td class="text-secondary">${new Date(a.date).toLocaleString("fr-FR")}</td>
+      <td>${esc(a.document || "")}</td>
+      <td>${a.statut === "termine" ? badge("ok", "Terminé") : badge("manquante", "Erreur")}</td>
+      <td>${a.duree_s == null ? "–" : `${a.duree_s} s`}</td>
+      <td>${a.paragraphes ?? "–"}</td>
+      <td>${pct(a.confiance_moyenne)}</td>
+      <td>${pct(a.part_autre)}</td></tr>`).join("") || `<tr><td colspan="7" class="text-secondary">Aucun audit enregistré.</td></tr>`;
+}
+
+async function loadMonitoring() {
+  try {
+    const m = await api("/monitoring");
+    const n = m.alertes.length;
+    $("nav-alerts").textContent = n;
+    $("nav-alerts").hidden = n === 0;
+    if (!$("view-monitoring").hidden) renderMonitoring(m);
+  } catch (_) { /* service injoignable : déjà signalé dans le menu */ }
+}
+
 // ---------- Mode sombre ----------
 
 function applyTheme(theme) {
@@ -322,6 +396,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("#tabs .nav-link").forEach((t) => t.addEventListener("click", (e) => { e.preventDefault(); selectTab(t.dataset.tab); }));
   document.querySelectorAll("#filters .btn").forEach((c) => c.addEventListener("click", () => renderAttendues(c.dataset.filter)));
   $("nav-new").addEventListener("click", (e) => { e.preventDefault(); clearTimeout(pollTimer); show("welcome"); });
+  $("nav-monitoring").addEventListener("click", (e) => { e.preventDefault(); clearTimeout(pollTimer); show("monitoring"); loadMonitoring(); });
   initTheme();
   $("search-clauses").addEventListener("input", (e) => renderClauses(e.target.value));
   $("feedback-form").addEventListener("submit", (e) => {
@@ -330,4 +405,6 @@ document.addEventListener("DOMContentLoaded", () => {
   checkHealth();
   loadHistory();
   setInterval(checkHealth, 15000);
+  loadMonitoring();
+  setInterval(loadMonitoring, 10000);         // la page Monitoring se met à jour toute seule
 });

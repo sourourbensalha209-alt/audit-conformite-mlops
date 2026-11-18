@@ -14,9 +14,11 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+from src import monitoring
 
 ROOT = Path(__file__).resolve().parents[2]
 FEEDBACK_FILE = ROOT / "data" / "feedback" / "corrections.jsonl"
@@ -95,16 +97,22 @@ def _run_audit(job_id: str, path: Path, title: str) -> None:
 
     JOBS[job_id]["status"] = "en_cours"
     debut = datetime.now(timezone.utc)
+    taille_ko = round(path.stat().st_size / 1024, 1)
+    trace = {"job_id": job_id, "document": JOBS[job_id]["document"], "taille_ko": taille_ko}
     try:
         result, html = audit_file(path, title)
+        duree = round((datetime.now(timezone.utc) - debut).total_seconds(), 1)
         REPORTS[job_id] = html
         JOBS[job_id]["findings"] = _findings(result)
         JOBS[job_id]["resultat"] = result
-        JOBS[job_id]["duree_s"] = round((datetime.now(timezone.utc) - debut).total_seconds(), 1)
+        JOBS[job_id]["duree_s"] = duree
         JOBS[job_id]["status"] = "termine"
+        monitoring.record({**trace, "statut": "termine", "duree_s": duree, **result.get("monitoring", {})})
     except Exception as exc:  # noqa: BLE001
         JOBS[job_id]["status"] = "erreur"
         JOBS[job_id]["erreur"] = str(exc)
+        duree = round((datetime.now(timezone.utc) - debut).total_seconds(), 1)
+        monitoring.record({**trace, "statut": "erreur", "duree_s": duree, "erreur": str(exc)[:300]})
     finally:
         shutil.rmtree(path.parent, ignore_errors=True)
 
@@ -153,6 +161,18 @@ def get_report_html(job_id: str) -> str:
     if job_id not in REPORTS:
         raise HTTPException(409, f"Rapport pas encore pret (statut : {JOBS[job_id]['status']})")
     return REPORTS[job_id]
+
+
+@app.get("/monitoring")
+def get_monitoring() -> dict:
+    """Indicateurs du service et du modèle, alertes de dérive, série des derniers audits."""
+    return monitoring.summary(feedback_path=FEEDBACK_FILE)
+
+
+@app.get("/metrics", response_class=PlainTextResponse, include_in_schema=False)
+def get_metrics() -> str:
+    """Mêmes indicateurs au format Prometheus."""
+    return monitoring.prometheus(feedback_path=FEEDBACK_FILE)
 
 
 @app.post("/feedback", status_code=201)
