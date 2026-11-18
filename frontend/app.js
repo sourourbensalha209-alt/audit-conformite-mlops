@@ -5,6 +5,8 @@
 //   GET  /audits            historique
 //   POST /feedback          correction d'un juriste
 //   GET  /monitoring        indicateurs du service et du modèle, alertes de dérive
+//   GET  /categories        catégories du modèle en production
+//   GET  /reentrainement    exemples des juristes, dernière décision · POST /reentrainement/verifier : lance l'orchestrateur
 // Aucune bibliothèque externe : JavaScript standard.
 
 const API = "";                      // même serveur que l'interface
@@ -223,10 +225,13 @@ function renderClauses(query) {
         ${c.confiance == null ? `<span class="small text-secondary">détectée par ${esc(c.source || "mots-clés")}</span>` : confBar(c.confiance)}
       </div>
       <div class="excerpt">${esc(cut(c.texte, 400))}</div>
+      <div class="text-end"><button class="btn btn-sm btn-ghost-primary" data-cat="${c.n}">${ICON("edit")} Corriger la catégorie</button></div>
       ${c.regle ? `<div class="small text-secondary mt-2"><b>Règle ${esc(c.regle.id)} — ${esc(c.regle.titre)}</b> : ${esc(cut(c.regle.regle, 260))}</div>` : ""}
       ${c.rgpd ? `<div class="small mt-2"><span class="badge bg-purple-lt me-1">${ICON("shield-lock", "icon icon-sm")} Données personnelles</span>
         Contrôle ${esc(c.rgpd.id)} · ${esc(c.rgpd.theme)} — ${esc(c.rgpd.refs.join(", "))}. <b>À vérifier par un humain.</b></div>` : ""}
     </div>`).join("") : `<div class="list-group-item text-secondary">Aucune clause ne correspond.</div>`;
+  $("list-clauses").querySelectorAll("[data-cat]").forEach((b) => b.addEventListener("click", () =>
+    openCategoryFeedback(currentResult.clauses.find((c) => c.n === Number(b.dataset.cat)))));
 }
 
 function renderIdentite() {
@@ -341,7 +346,7 @@ async function loadMonitoring() {
     const n = m.alertes.length;
     $("nav-alerts").textContent = n;
     $("nav-alerts").hidden = n === 0;
-    if (!$("view-monitoring").hidden) renderMonitoring(m);
+    if (!$("view-monitoring").hidden) { renderMonitoring(m); loadReentrainement(); }
   } catch (_) { /* service injoignable : déjà signalé dans le menu */ }
 }
 
@@ -364,26 +369,102 @@ function initTheme() {
 
 // ---------- Correction d'un juriste ----------
 
+let feedbackMode = "attendue";      // "attendue" : verdict d'une clause attendue · "categorie" : catégorie d'un passage
+let categoriesCache = null;
+
+function feedbackFields(mode) {
+  feedbackMode = mode;
+  $("fb-verdict-group").hidden = mode !== "attendue";
+  $("fb-texte-group").hidden = mode !== "attendue";
+  $("fb-categorie-group").hidden = mode !== "categorie";
+  $("fb-comment").value = "";
+  $("fb-texte").value = "";
+}
+
 function openFeedback(item) {
   feedbackTarget = item;
+  feedbackFields("attendue");
   $("fb-clause").textContent = `${item.titre} — résultat actuel : ${LIBELLE[item.statut]}`;
   $("fb-verdict").value = item.statut;
-  $("fb-comment").value = "";
+  $("feedback-dialog").showModal();
+}
+
+async function openCategoryFeedback(clause) {
+  feedbackTarget = clause;
+  feedbackFields("categorie");
+  $("fb-clause").textContent = `§${clause.n} — catégorie proposée par le modèle : ${clause.categorie}`;
+  try {
+    categoriesCache = categoriesCache || await api("/categories");
+  } catch (err) {
+    toast(`Catégories indisponibles : ${err.message}`);
+    return;
+  }
+  $("fb-categorie").innerHTML = categoriesCache.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  $("fb-categorie").value = categoriesCache.includes(clause.categorie) ? clause.categorie : categoriesCache[0];
   $("feedback-dialog").showModal();
 }
 
 async function sendFeedback() {
-  const body = {
-    job_id: currentJob,
-    clause_ref: feedbackTarget.categorie,
-    verdict_corrige: $("fb-verdict").value,
-    commentaire: $("fb-comment").value || null,
-  };
+  const t = feedbackTarget;
+  let body;
+  if (feedbackMode === "categorie") {
+    body = { job_id: currentJob, clause_ref: `§${t.n}`, texte: t.texte, categorie_corrigee: $("fb-categorie").value,
+             commentaire: $("fb-comment").value || null };
+  } else {
+    const verdict = $("fb-verdict").value;
+    const texte = $("fb-texte").value.trim() || null;
+    body = { job_id: currentJob, clause_ref: t.categorie, verdict_corrige: verdict, commentaire: $("fb-comment").value || null,
+             texte, categorie_corrigee: verdict === "presente" && texte ? t.categorie : null };
+  }
   try {
     await api("/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    toast("Correction enregistrée : elle servira au réentraînement.");
+    toast(body.categorie_corrigee
+      ? "Correction enregistrée : elle devient un exemple pour le réentraînement."
+      : "Correction enregistrée.");
+    loadMonitoring();
   } catch (err) {
     toast(`Échec de l'enregistrement : ${err.message}`);
+  }
+}
+
+// ---------- Réentraînement ----------
+
+function renderReentrainement(r, modele) {
+  $("rt-modele").textContent = modele ? `en production : ${modele}` : "";
+  const n = r.exemples_disponibles, seuil = r.seuil;
+  $("rt-compte").textContent = `${n} / ${seuil}`;
+  $("rt-barre").style.width = `${Math.min(100, (100 * n) / seuil)}%`;
+  const d = r.derniere_decision;
+  if (!d) {
+    $("rt-decision").innerHTML = `<span class="text-secondary">Aucune vérification lancée. L'orchestrateur décide de réentraîner
+      à partir de ${seuil} nouveaux exemples corrigés, ou si le monitoring signale une dérive.</span>`;
+  } else {
+    $("rt-decision").innerHTML = `
+      <div class="mb-1">${d.reentrainer ? badge("ok", "Réentraînement décidé") : badge("a_verifier", "Modèle conservé")}
+        <span class="text-secondary ms-1">${new Date(d.date).toLocaleString("fr-FR")}</span></div>
+      <ul class="mb-0 ps-3">${d.raisons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+      ${d.conseil ? `<div class="text-secondary mt-1">${esc(d.conseil)}</div>` : ""}`;
+  }
+  $("rt-paquet").hidden = !(d && d.paquet);
+}
+
+async function loadReentrainement() {
+  try {
+    const [r, h] = await Promise.all([api("/reentrainement"), api("/health")]);
+    renderReentrainement(r, h.modele);
+  } catch (_) { /* service injoignable */ }
+}
+
+async function verifierReentrainement() {
+  $("rt-verifier").disabled = true;
+  try {
+    const d = await api("/reentrainement/verifier", { method: "POST" });
+    toast(d.reentrainer ? "Réentraînement décidé : le paquet Colab est prêt." : "Vérification faite : le modèle actuel est conservé.");
+    await loadReentrainement();
+  } catch (err) {
+    toast(`Échec : ${err.message}`);
+  } finally {
+    $("rt-verifier").disabled = false;
   }
 }
 
@@ -397,6 +478,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("#filters .btn").forEach((c) => c.addEventListener("click", () => renderAttendues(c.dataset.filter)));
   $("nav-new").addEventListener("click", (e) => { e.preventDefault(); clearTimeout(pollTimer); show("welcome"); });
   $("nav-monitoring").addEventListener("click", (e) => { e.preventDefault(); clearTimeout(pollTimer); show("monitoring"); loadMonitoring(); });
+  $("rt-verifier").addEventListener("click", verifierReentrainement);
   initTheme();
   $("search-clauses").addEventListener("input", (e) => renderClauses(e.target.value));
   $("feedback-form").addEventListener("submit", (e) => {

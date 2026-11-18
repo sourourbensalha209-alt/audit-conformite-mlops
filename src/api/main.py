@@ -14,11 +14,13 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src import monitoring
+from src.orchestration import retrain
+from src.orchestration.registry import production_model_dir
 
 ROOT = Path(__file__).resolve().parents[2]
 FEEDBACK_FILE = ROOT / "data" / "feedback" / "corrections.jsonl"
@@ -66,13 +68,24 @@ class AuditReport(BaseModel):
 class Feedback(BaseModel):
     job_id: str
     clause_ref: str
-    verdict_corrige: Verdict
+    verdict_corrige: Verdict | None = None
     commentaire: str | None = None
+    texte: str | None = Field(None, description="Passage du contrat concerné : avec categorie_corrigee, devient un exemple d'entraînement")
+    categorie_corrigee: str | None = Field(None, description="Bonne catégorie de ce passage, selon le juriste")
 
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok"}
+    return {"status": "ok", "modele": production_model_dir().name}
+
+
+@app.get("/categories")
+def categories() -> list[str]:
+    """Catégories du modèle en production (pour corriger la catégorie d'un passage)."""
+    path = production_model_dir() / "labels.json"
+    if not path.exists():
+        raise HTTPException(503, "Modèle absent : labels.json introuvable")
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _findings(result: dict) -> list[dict]:
@@ -175,13 +188,34 @@ def get_metrics() -> str:
     return monitoring.prometheus(feedback_path=FEEDBACK_FILE)
 
 
+@app.get("/reentrainement")
+def get_reentrainement() -> dict:
+    """Dernière décision de l'orchestrateur, et exemples de juristes disponibles."""
+    exemples, _ = retrain.collect(FEEDBACK_FILE)
+    return {"derniere_decision": retrain.state(), "exemples_disponibles": len(exemples), "seuil": retrain.SEUIL_EXEMPLES}
+
+
+@app.post("/reentrainement/verifier")
+def run_reentrainement(force: bool = False) -> dict:
+    """Lance l'orchestrateur : collecte des corrections, décision, paquet Colab si besoin."""
+    return retrain.run(force=force, feedback_path=FEEDBACK_FILE)
+
+
+@app.get("/reentrainement/paquet", include_in_schema=False)
+def download_paquet() -> FileResponse:
+    etat = retrain.state()
+    if not etat or not etat.get("paquet"):
+        raise HTTPException(404, "Aucun paquet de réentraînement préparé")
+    return FileResponse(retrain.WORK_DIR / etat["paquet"], filename=etat["paquet"])
+
+
 @app.post("/feedback", status_code=201)
 def submit_feedback(feedback: Feedback) -> dict:
     """Enregistre la correction d'un juriste. Alimente le reentrainement."""
     if feedback.job_id not in JOBS:
         raise HTTPException(404, "Tache inconnue")
     FEEDBACK_FILE.parent.mkdir(parents=True, exist_ok=True)
-    line = feedback.model_dump() | {"date": datetime.now(timezone.utc).isoformat()}
+    line = feedback.model_dump(mode="json") | {"date": datetime.now(timezone.utc).isoformat()}
     with FEEDBACK_FILE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(line, ensure_ascii=False) + "\n")
     return {"status": "enregistre", "clause_ref": feedback.clause_ref}

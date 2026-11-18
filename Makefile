@@ -1,4 +1,4 @@
-.PHONY: install data pipeline api mlflow test lint clean docker docker-stop
+.PHONY: install data pipeline api mlflow test lint clean docker docker-stop retrain promote
 
 install:
 	pip install -r requirements.txt
@@ -26,3 +26,9 @@ docker:
 
 docker-stop:
 	docker compose down
+
+retrain:
+	python -m src.orchestration.retrain
+
+promote:
+	python -m src.orchestration.promote $(MODELE)

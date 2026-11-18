@@ -16,10 +16,11 @@ from pathlib import Path
 from src.data.segment import segment
 from src.judge.report import analyse, build_meta, render_html
 from src.monitoring import model_stats
+from src.orchestration.registry import production_model_dir
 from src.retrieval.rules import load_rules
 
 ROOT = Path(__file__).resolve().parents[1]
-MODEL_DIR = ROOT / "models" / "best_model_v4"
+MODEL_DIR = production_model_dir()          # modèle désigné par models/production.json (best_model_v4 par défaut)
 RULES = ROOT / "data" / "rules" / "rules_contractuelles.json"
 
 

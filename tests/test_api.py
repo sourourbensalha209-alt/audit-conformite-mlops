@@ -24,13 +24,15 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setattr(pipeline, "audit_file", lambda path, title: (FAUX_RESULTAT, "<html>rapport</html>"))
     monkeypatch.setattr(api, "FEEDBACK_FILE", tmp_path / "corrections.jsonl")
     monkeypatch.setattr(api.monitoring, "LOG_FILE", tmp_path / "audits.jsonl")
+    monkeypatch.setattr(api.retrain, "WORK_DIR", tmp_path / "reentrainement")
+    monkeypatch.setattr(api.retrain, "_log_mlflow", lambda *a: None)
     api.JOBS.clear()
     api.REPORTS.clear()
     return TestClient(api.app)
 
 
 def test_health(client):
-    assert client.get("/health").json() == {"status": "ok"}
+    assert client.get("/health").json()["status"] == "ok"
 
 
 def test_format_refuse(client):
@@ -76,3 +78,15 @@ def test_monitoring_apres_un_audit(client):
     assert m["indicateurs"]["audits"] == 1 and m["indicateurs"]["termines"] == 1
     metrics = client.get("/metrics").text
     assert 'audit_total{statut="termine"} 1' in metrics
+
+
+def test_correction_avec_passage_puis_reentrainement(client):
+    job_id = client.post("/audit", files={"file": ("c.txt", b"texte")}).json()["job_id"]
+    passage = "In no event shall either party's aggregate liability exceed the fees paid in the last twelve months."
+    r = client.post("/feedback", json={"job_id": job_id, "clause_ref": "§3", "texte": passage,
+                                       "categorie_corrigee": "Cap On Liability"})
+    assert r.status_code == 201
+    assert client.get("/reentrainement").json()["exemples_disponibles"] == 1
+    d = client.post("/reentrainement/verifier?force=true").json()
+    assert d["reentrainer"] is True and d["paquet"] == "reentrainement_colab.zip"
+    assert client.get("/reentrainement/paquet").status_code == 200

@@ -152,9 +152,25 @@
             </div></div></div>
           </div>
 
-          <div class="card mb-3">
-            <div class="card-header"><h3 class="card-title">Alertes</h3></div>
-            <div class="list-group list-group-flush" id="mon-alertes"></div>
+          <div class="row row-cards mb-3">
+            <div class="col-lg-7"><div class="card h-100">
+              <div class="card-header"><h3 class="card-title">Alertes</h3></div>
+              <div class="list-group list-group-flush" id="mon-alertes"></div>
+            </div></div>
+            <div class="col-lg-5"><div class="card h-100">
+              <div class="card-header"><h3 class="card-title">Réentraînement</h3>
+                <div class="card-actions"><span class="badge bg-blue-lt" id="rt-modele"></span></div></div>
+              <div class="card-body">
+                <div class="d-flex justify-content-between small mb-1">
+                  <span>Exemples corrigés par les juristes</span><b id="rt-compte">–</b></div>
+                <div class="progress progress-sm mb-3"><div class="progress-bar bg-green" id="rt-barre" style="width:0%"></div></div>
+                <div class="small" id="rt-decision">Aucune vérification lancée.</div>
+              </div>
+              <div class="card-footer d-flex gap-2 justify-content-end">
+                <a class="btn btn-outline-secondary" id="rt-paquet" href="/reentrainement/paquet" hidden>Paquet Colab ↓</a>
+                <button class="btn btn-primary" id="rt-verifier">Vérifier maintenant</button>
+              </div>
+            </div></div>
           </div>
 
           <div class="row row-cards mb-3">
@@ -297,7 +313,7 @@
     <div class="card-header"><h3 class="card-title">Corriger ce résultat</h3></div>
     <div class="card-body">
       <p class="text-secondary" id="fb-clause"></p>
-      <div class="mb-3">
+      <div class="mb-3" id="fb-verdict-group">
         <label class="form-label" for="fb-verdict">Verdict corrigé</label>
         <select class="form-select" id="fb-verdict">
           <option value="presente">Présente</option>
@@ -306,6 +322,15 @@
           <option value="conforme">Conforme</option>
           <option value="non_conforme">Non conforme</option>
         </select>
+      </div>
+      <div class="mb-3" id="fb-categorie-group" hidden>
+        <label class="form-label" for="fb-categorie">Bonne catégorie de ce passage</label>
+        <select class="form-select" id="fb-categorie"></select>
+      </div>
+      <div class="mb-3" id="fb-texte-group">
+        <label class="form-label" for="fb-texte">Passage du contrat <span class="text-secondary fw-normal">(facultatif)</span></label>
+        <textarea class="form-control" id="fb-texte" rows="3" placeholder="Si la clause existe, collez ici le passage du contrat."></textarea>
+        <div class="form-hint">Avec le passage, la correction devient un exemple pour réentraîner le modèle.</div>
       </div>
       <div>
         <label class="form-label" for="fb-comment">Commentaire</label>
