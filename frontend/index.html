@@ -1,0 +1,269 @@
+<!doctype html>
+<!--
+  Interface de l'Agent d'audit de conformité documentaire.
+  Mise en page : Tabler (https://tabler.io, licence MIT), copié dans vendor/ pour fonctionner hors connexion.
+  Code propre au projet : index.html, app.css, app.js.
+-->
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Agent d'audit de conformité documentaire</title>
+  <link rel="stylesheet" href="vendor/tabler/tabler.min.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="page">
+
+  <!-- ===== Menu latéral ===== -->
+  <aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark">
+    <div class="container-fluid">
+      <h1 class="navbar-brand navbar-brand-autodark">
+        <a href="./" class="brand">
+          <span class="brand-logo"><svg class="icon"><use href="vendor/icons.svg#i-scale"/></svg></span>
+          <span class="brand-text">Agent d'audit<small>de conformité documentaire</small></span>
+        </a>
+      </h1>
+
+      <div class="navbar-nav pt-lg-3">
+        <a class="nav-link active" href="#" id="nav-new">
+          <span class="nav-link-icon"><svg class="icon"><use href="vendor/icons.svg#i-file-upload"/></svg></span>
+          <span class="nav-link-title">Nouvel audit</span>
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">
+          <span>Historique</span>
+          <button class="btn btn-icon btn-ghost-light btn-sm" id="btn-refresh" title="Rafraîchir">
+            <svg class="icon"><use href="vendor/icons.svg#i-refresh"/></svg>
+          </button>
+        </div>
+        <div class="history" id="history"><div class="history-empty">Aucun audit pour l'instant.</div></div>
+      </div>
+
+      <div class="sidebar-foot">
+        <div class="api-status" id="api-status"><span class="status-dot"></span><span class="label">Connexion…</span></div>
+        <button class="btn btn-ghost-light btn-sm w-100 mt-2" id="btn-theme">
+          <svg class="icon"><use href="vendor/icons.svg#i-moon"/></svg> <span>Mode sombre</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== Contenu ===== -->
+  <div class="page-wrapper">
+    <div class="page-header d-print-none">
+      <div class="container-xl">
+        <div class="row g-2 align-items-center">
+          <div class="col">
+            <div class="page-pretitle">Contrats · RGPD · Loi tunisienne 2004-63</div>
+            <h2 class="page-title" id="page-title">Nouvel audit</h2>
+          </div>
+          <div class="col-auto">
+            <a class="btn btn-outline-primary" id="btn-report" target="_blank" rel="noopener" hidden>
+              <svg class="icon"><use href="vendor/icons.svg#i-external-link"/></svg> Rapport complet
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div class="container-xl">
+
+        <!-- Accueil : dépôt du contrat -->
+        <div class="row row-cards" id="view-welcome">
+          <div class="col-lg-7">
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">Déposer un contrat</h3></div>
+              <div class="card-body">
+                <label class="dropzone" id="dropzone" for="file-input">
+                  <input type="file" id="file-input" accept=".pdf,.docx,.txt" hidden>
+                  <span class="avatar avatar-lg bg-primary-lt mb-3">
+                    <svg class="icon icon-lg"><use href="vendor/icons.svg#i-upload"/></svg>
+                  </span>
+                  <span class="h3 mb-1">Glissez votre contrat ici</span>
+                  <span class="text-secondary">ou cliquez pour choisir un fichier · PDF, Word (.docx) ou texte</span>
+                </label>
+                <div class="file-picked mt-3" id="file-picked" hidden>
+                  <svg class="icon text-primary"><use href="vendor/icons.svg#i-file-text"/></svg>
+                  <span id="file-name"></span>
+                </div>
+              </div>
+              <div class="card-footer text-end">
+                <button class="btn btn-primary btn-lg" id="btn-audit" disabled>
+                  <svg class="icon"><use href="vendor/icons.svg#i-file-search"/></svg> Lancer l'audit
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-5">
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">Comment fonctionne l'audit</h3></div>
+              <div class="card-body">
+                <ul class="steps steps-vertical steps-blue">
+                  <li class="step-item"><div class="h4 m-0">Lecture</div><div class="text-secondary">Le texte est extrait du PDF ou du document Word.</div></li>
+                  <li class="step-item"><div class="h4 m-0">Découpage</div><div class="text-secondary">Le contrat est découpé en clauses.</div></li>
+                  <li class="step-item"><div class="h4 m-0">Classification</div><div class="text-secondary">Legal-BERT reconnaît le type de chaque clause.</div></li>
+                  <li class="step-item"><div class="h4 m-0">Contrôle</div><div class="text-secondary">Les clauses attendues absentes sont signalées.</div></li>
+                  <li class="step-item active"><div class="h4 m-0">Rapport</div><div class="text-secondary">Un rapport est produit, à relire par un juriste.</div></li>
+                </ul>
+              </div>
+            </div>
+            <div class="alert alert-warning mt-3 mb-0">
+              <div class="d-flex gap-2">
+                <svg class="icon alert-icon"><use href="vendor/icons.svg#i-info-circle"/></svg>
+                <div>Le système ne rend <b>aucun verdict « conforme » automatique</b> : il repère, classe et signale.
+                  La décision revient au juriste, qui peut corriger chaque résultat.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progression -->
+        <div class="card" id="view-progress" hidden>
+          <div class="card-body py-5">
+            <h3 class="text-center mb-4" id="progress-title">Analyse en cours</h3>
+            <ul class="steps steps-counter steps-blue my-4" id="stepper">
+              <li class="step-item" data-step="0">Envoi</li>
+              <li class="step-item" data-step="1">Lecture et découpage</li>
+              <li class="step-item" data-step="2">Classification</li>
+              <li class="step-item" data-step="3">Rapport</li>
+            </ul>
+            <div class="progress progress-sm mx-auto" style="max-width: 420px"><div class="progress-bar progress-bar-indeterminate"></div></div>
+            <p class="text-secondary text-center mt-3 mb-0" id="progress-msg"></p>
+          </div>
+        </div>
+
+        <!-- Erreur -->
+        <div class="alert alert-danger" id="view-error" hidden>
+          <div class="d-flex gap-2">
+            <svg class="icon alert-icon"><use href="vendor/icons.svg#i-alert-circle"/></svg>
+            <div><h4 class="alert-title">L'audit a échoué</h4><div id="error-msg"></div></div>
+          </div>
+        </div>
+
+        <!-- Résultats -->
+        <div id="view-result" hidden>
+          <p class="text-secondary mb-3" id="res-meta"></p>
+
+          <div class="row row-deck row-cards mb-3">
+            <div class="col-sm-6 col-lg-3">
+              <div class="card card-sm"><div class="card-body d-flex align-items-center gap-3">
+                <span class="avatar bg-primary text-white"><svg class="icon"><use href="vendor/icons.svg#i-list-check"/></svg></span>
+                <div><div class="h1 m-0" id="kpi-clauses">–</div><div class="text-secondary">clauses reconnues</div></div>
+              </div></div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+              <div class="card card-sm"><div class="card-body d-flex align-items-center gap-3">
+                <span class="avatar bg-red text-white"><svg class="icon"><use href="vendor/icons.svg#i-alert-triangle"/></svg></span>
+                <div><div class="h1 m-0" id="kpi-missing">–</div><div class="text-secondary">clauses manquantes</div></div>
+              </div></div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+              <div class="card card-sm"><div class="card-body d-flex align-items-center gap-3">
+                <span class="avatar bg-yellow text-white"><svg class="icon"><use href="vendor/icons.svg#i-search"/></svg></span>
+                <div><div class="h1 m-0" id="kpi-check">–</div><div class="text-secondary">à vérifier</div></div>
+              </div></div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+              <div class="card card-sm"><div class="card-body d-flex align-items-center gap-3">
+                <span class="avatar bg-purple text-white"><svg class="icon"><use href="vendor/icons.svg#i-shield-lock"/></svg></span>
+                <div><div class="h1 m-0" id="kpi-rgpd">–</div><div class="text-secondary">données personnelles</div></div>
+              </div></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <ul class="nav nav-tabs card-header-tabs" id="tabs">
+                <li class="nav-item"><a href="#" class="nav-link active" data-tab="attendues">
+                  <svg class="icon me-1"><use href="vendor/icons.svg#i-circle-check"/></svg>Clauses attendues</a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-tab="clauses">
+                  <svg class="icon me-1"><use href="vendor/icons.svg#i-file-text"/></svg>Clauses trouvées</a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-tab="identite">
+                  <svg class="icon me-1"><use href="vendor/icons.svg#i-id-badge-2"/></svg>Identification</a></li>
+                <li class="nav-item"><a href="#" class="nav-link" data-tab="rapport">
+                  <svg class="icon me-1"><use href="vendor/icons.svg#i-report"/></svg>Rapport</a></li>
+              </ul>
+            </div>
+
+            <div class="tab-panel" id="tab-attendues">
+              <div class="card-body border-bottom py-3">
+                <div class="btn-group" role="group" id="filters">
+                  <button class="btn active" data-filter="all">Toutes</button>
+                  <button class="btn" data-filter="manquante">Manquantes</button>
+                  <button class="btn" data-filter="a_verifier">À vérifier</button>
+                  <button class="btn" data-filter="presente">Présentes</button>
+                </div>
+              </div>
+              <div class="list-group list-group-flush" id="list-attendues"></div>
+            </div>
+
+            <div class="tab-panel" id="tab-clauses" hidden>
+              <div class="card-body border-bottom py-3">
+                <div class="input-icon">
+                  <span class="input-icon-addon"><svg class="icon"><use href="vendor/icons.svg#i-search"/></svg></span>
+                  <input type="search" class="form-control" id="search-clauses" placeholder="Rechercher une clause ou une catégorie…">
+                </div>
+              </div>
+              <div class="list-group list-group-flush" id="list-clauses"></div>
+            </div>
+
+            <div class="tab-panel" id="tab-identite" hidden>
+              <div class="list-group list-group-flush" id="list-identite"></div>
+            </div>
+
+            <div class="tab-panel" id="tab-rapport" hidden>
+              <iframe id="report-frame" class="report-frame" title="Rapport d'audit"></iframe>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <footer class="footer footer-transparent d-print-none">
+      <div class="container-xl text-secondary small">
+        Agent d'audit de conformité documentaire · Legal-BERT v4 · Interface réalisée avec Tabler (MIT)
+      </div>
+    </footer>
+  </div>
+</div>
+
+<!-- ===== Correction d'un juriste ===== -->
+<dialog id="feedback-dialog" class="feedback-dialog">
+  <form method="dialog" id="feedback-form" class="card m-0">
+    <div class="card-header"><h3 class="card-title">Corriger ce résultat</h3></div>
+    <div class="card-body">
+      <p class="text-secondary" id="fb-clause"></p>
+      <div class="mb-3">
+        <label class="form-label" for="fb-verdict">Verdict corrigé</label>
+        <select class="form-select" id="fb-verdict">
+          <option value="presente">Présente</option>
+          <option value="manquante">Manquante</option>
+          <option value="a_verifier">À vérifier</option>
+          <option value="conforme">Conforme</option>
+          <option value="non_conforme">Non conforme</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label" for="fb-comment">Commentaire</label>
+        <textarea class="form-control" id="fb-comment" rows="3" placeholder="Ex. : la date d'échéance figure à l'article 3."></textarea>
+      </div>
+    </div>
+    <div class="card-footer d-flex justify-content-end gap-2">
+      <button class="btn" value="cancel" formnovalidate>Annuler</button>
+      <button class="btn btn-primary" value="send">Enregistrer la correction</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="app-toast" id="toast" role="status" hidden></div>
+
+<script src="vendor/tabler/tabler.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -42,3 +42,4 @@ evidently==0.4.40
 
 # --- Tests ---
 pytest==8.3.3
+httpx==0.27.2            # client de test de FastAPI (tests/test_api.py)

@@ -14,11 +14,13 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parents[2]
 FEEDBACK_FILE = ROOT / "data" / "feedback" / "corrections.jsonl"
+FRONTEND_DIR = ROOT / "frontend"
 
 app = FastAPI(
     title="Agent d'audit de conformite documentaire",
@@ -54,7 +56,9 @@ class AuditReport(BaseModel):
     created_at: datetime
     document: str | None = None
     erreur: str | None = None
+    duree_s: float | None = Field(None, description="Duree de l'analyse en secondes")
     findings: list[ClauseFinding] = []
+    resultat: dict | None = Field(None, description="Analyse detaillee : identite, clauses attendues, clauses trouvees")
 
 
 class Feedback(BaseModel):
@@ -90,10 +94,13 @@ def _run_audit(job_id: str, path: Path, title: str) -> None:
     from src.pipeline import audit_file      # import ici : l'API demarre sans charger le modele
 
     JOBS[job_id]["status"] = "en_cours"
+    debut = datetime.now(timezone.utc)
     try:
         result, html = audit_file(path, title)
         REPORTS[job_id] = html
         JOBS[job_id]["findings"] = _findings(result)
+        JOBS[job_id]["resultat"] = result
+        JOBS[job_id]["duree_s"] = round((datetime.now(timezone.utc) - debut).total_seconds(), 1)
         JOBS[job_id]["status"] = "termine"
     except Exception as exc:  # noqa: BLE001
         JOBS[job_id]["status"] = "erreur"
@@ -121,6 +128,13 @@ async def submit_audit(background: BackgroundTasks, file: UploadFile = File(...)
     JOBS[job_id] = report.model_dump()
     background.add_task(_run_audit, job_id, tmp, Path(file.filename).stem)
     return report
+
+
+@app.get("/audits")
+def list_audits() -> list[dict]:
+    """Historique des audits de la session, du plus recent au plus ancien."""
+    jobs = sorted(JOBS.values(), key=lambda j: j["created_at"], reverse=True)
+    return [{k: j[k] for k in ("job_id", "status", "created_at", "document")} for j in jobs]
 
 
 @app.get("/audit/{job_id}", response_model=AuditReport)
@@ -151,3 +165,12 @@ def submit_feedback(feedback: Feedback) -> dict:
     with FEEDBACK_FILE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(line, ensure_ascii=False) + "\n")
     return {"status": "enregistre", "clause_ref": feedback.clause_ref}
+
+
+# Interface web (code source dans frontend/) : http://localhost:8000/
+if FRONTEND_DIR.exists():
+    app.mount("/app", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+
+    @app.get("/", include_in_schema=False)
+    def accueil() -> RedirectResponse:
+        return RedirectResponse("/app/")
