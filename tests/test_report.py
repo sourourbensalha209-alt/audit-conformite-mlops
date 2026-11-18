@@ -61,3 +61,21 @@ def test_titre_sans_numero_d_annexe_et_incoherences(book):
     assert _display("Parties", "4 Foo Inc.") == "4 Foo Inc."                          # seul le titre est nettoyé
     with pytest.raises(ValueError):
         analyse(TEXT, LABELS, _probs("Autre"), book)                                  # 3 paragraphes mais 1 ligne de probabilités
+
+
+def test_interface_a_plusieurs_contrats(book):
+    import json
+    import re
+
+    from src.judge.report import render_interface
+
+    a1 = analyse(TEXT, LABELS, _probs("Autre", "Governing Law", "Audit Rights"), book)
+    a2 = analyse(TEXT, LABELS, _probs("Autre", "Autre", "Autre"), book)
+    page = render_interface([{"titre": "Contrat <A>", "analyse": a1}, {"titre": "B", "analyse": a2}], build_meta("", "m", "v"))
+    data = json.loads(re.search(r"const DATA = (.*?);\nconst sel", page, re.S).group(1))           # les données embarquées sont du JSON valide
+    assert [d["titre"] for d in data] == ["Contrat <A>", "B"]
+    assert all(d["presente"] + d["manquante"] + d["a_verifier"] == 7 for d in data)                # 7 clauses attendues par contrat
+    assert data[0]["clauses"] == 2 and data[1]["clauses"] == 0
+    assert page.count("</script>") == 1                                                            # le contenu des contrats ne ferme pas la balise script
+    assert "http://" not in page and "https://" not in page                                         # aucune ressource externe : marche hors ligne
+    assert "Contrat <A>" not in page.split("const DATA")[0]                                         # le titre n'est pas injecté tel quel dans la page

@@ -293,6 +293,8 @@ correction, 0,0 % après) ; (2) ajout de la mesure de discrimination. Les critè
 les contrôles RGPD à vérifier. Le rapport ne rend aucun verdict « conforme / non conforme » (voir « Phase 5 ») : « manquante » n'est affirmé
 que pour la responsabilité plafonnée et la loi applicable, où la mesure n'a donné aucune fausse alerte ; pour les autres catégories, il écrit
 « à vérifier ». Pour les 30 contrats de confirmation, le rapport sort instantanément à partir des calculs enregistrés.
+`python scripts/build_interface.py` rassemble ces 30 rapports dans une seule page (liste déroulante, vue d'ensemble, boutons précédent et suivant) :
+une interface de démonstration, sans serveur ni modèle. Envoyer un nouveau contrat depuis une page web est la prochaine étape (API).
 
 ---
 
@@ -327,9 +329,10 @@ que pour la responsabilité plafonnée et la loi applicable, où la mesure n'a d
 - Découpage : `python scripts/eval_segmentation.py`
 - Essai de bout en bout : `python scripts/eval_pipeline.py --model models/best_model_v4 --contracts 30 --fresh --mlflow`
 - Rapport d'audit d'un contrat (page HTML) : `python scripts/audit_contract.py --list`, puis `python scripts/audit_contract.py --cuad TUNIU`
+- Interface de démonstration (liste de contrats, sans serveur) : `python scripts/build_interface.py`
 - Clauses manquantes : `python scripts/eval_missing.py --model models/best_model_v4`
 - Cas du juge : `python scripts/build_judge_cases.py` ; modèles : `notebooks/judge_colab.ipynb` ; mesure : `python scripts/eval_judge.py --sheet data/judge/annotations_sourour.csv data/judge/annotations_ghayth.csv`
-- Tests : `python -m pytest tests/test_law_watch.py tests/test_segment.py tests/test_autre.py tests/test_header.py tests/test_judge.py tests/test_report.py -q` (73 tests)
+- Tests : `python -m pytest tests/test_law_watch.py tests/test_segment.py tests/test_autre.py tests/test_header.py tests/test_judge.py tests/test_report.py -q` (74 tests)
 
 ---
 

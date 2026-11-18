@@ -11,6 +11,7 @@ Il ne produit AUCUN verdict automatique « conforme / non conforme » : les mod�
 from __future__ import annotations
 
 import html
+import json
 import re
 from datetime import datetime
 
@@ -59,7 +60,7 @@ def analyse(text: str, labels: list[str], probs_by_segment: list[list[float]], b
         cat = r["category"]
         if cat in HEADER_CATEGORIES:
             found = header[cat]
-            preuve = {"texte": found.text, "confiance": None, "source": "extracteur à règles"} if found else None
+            preuve = {"texte": _display(cat, found.text), "confiance": None, "source": "extracteur à règles"} if found else None
         else:
             hit = best.get(cat)
             preuve = {"texte": hit["texte"], "confiance": hit["confiance"], "source": "classifieur"} if hit else None
@@ -110,7 +111,8 @@ def _cut(t: str, n: int) -> str:
     return t if len(t) <= n else t[:n].rsplit(" ", 1)[0] + " …"
 
 
-def render_html(a: dict, meta: dict) -> str:
+def render_body(a: dict) -> str:
+    """Le rapport d'un contrat (sans page autour) : utilisé seul ou dans l'interface à plusieurs contrats."""
     s = a["stats"]
     rows_id = "".join(
         f"<tr><td><b>{_e(i['categorie'])}</b></td><td>" +
@@ -138,14 +140,7 @@ def render_html(a: dict, meta: dict) -> str:
                 f"{_e(c['rgpd']['theme'])} — {_e(', '.join(c['rgpd']['refs']))}. <b>À vérifier par un humain.</b></div>" if c["rgpd"] else "")
         rows_cl += (f"<tr><td>{c['n']}</td><td><b>{_e(c['categorie'])}</b><div class='small'>confiance {c['confiance']:.2f}</div></td>"
                     f"<td class='excerpt'>{_e(_cut(c['texte'], 330))}</td><td>{rule}{rgpd}</td></tr>")
-    return f"""<!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rapport d'audit — {_e(meta['titre'])}</title><style>{_CSS}</style></head><body>
-<header><div class="wrap"><h1>Rapport d'audit de contrat</h1>
-<div class="sub">{_e(meta['titre'])}</div>
-<div class="meta">Généré le {_e(meta['date'])} · modèle {_e(meta['modele'])} · corpus de lois version {_e(meta['version_corpus'])}</div></div></header>
-<div class="wrap">
-<div class="note"><b>Aperçu technique, pas un avis juridique.</b> Ce rapport ne rend aucun verdict « conforme / non conforme » : les modèles
+    return f"""<div class="note"><b>Aperçu technique, pas un avis juridique.</b> Ce rapport ne rend aucun verdict « conforme / non conforme » : les modèles
 de langage ouverts testés ne distinguent pas ces cas (voir README, Phase 5). Il signale ce qui est mesuré comme fiable et marque
 « à vérifier » ce qui demande un relecteur humain. Les règles de contrôle sont des contrôles de l'équipe, rattachés aux définitions CUAD,
 sans relecture juridique.</div>
@@ -159,8 +154,85 @@ sans relecture juridique.</div>
 <table><tr><th>#</th><th>Catégorie</th><th>Extrait</th><th>Règle de contrôle associée</th></tr>{rows_cl}</table>
 <footer>Mesures de référence (README) : classification des clauses, rappel 79 % et 9,5 % de fausses détections sur 30 contrats jamais regardés ;
 extraction de l'identité mesurée sur 102 contrats ; clauses manquantes : précision 62,5 % contre 22,4 % de base.</footer>
-</div></body></html>"""
+"""
+
+
+def render_html(a: dict, meta: dict) -> str:
+    body = render_body(a)
+    return f"""<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rapport d'audit — {_e(meta['titre'])}</title><style>{_CSS}</style></head><body>
+<header><div class="wrap"><h1>Rapport d'audit de contrat</h1>
+<div class="sub">{_e(meta['titre'])}</div>
+<div class="meta">Généré le {_e(meta['date'])} · modèle {_e(meta['modele'])} · corpus de lois version {_e(meta['version_corpus'])}</div></div></header>
+<div class="wrap">
+{body}</div></body></html>"""
 
 
 def build_meta(titre: str, modele: str, version_corpus: str) -> dict:
     return {"titre": titre, "modele": modele, "version_corpus": version_corpus, "date": datetime.now().strftime("%d/%m/%Y %H:%M")}
+
+
+def statut_counts(a: dict) -> dict:
+    return {k: sum(1 for x in a["attendues"] if x["statut"] == k) for k in ("presente", "manquante", "a_verifier")}
+
+
+_CSS_INTERFACE = """
+.barre{margin:12px 0}select{font-size:15px;padding:7px;max-width:100%;width:640px}
+button{font-size:14px;padding:7px 14px;margin-left:6px;border:1px solid #14213d;background:#fff;color:#14213d;border-radius:6px;cursor:pointer}
+button:hover{background:#14213d;color:#fff}summary{cursor:pointer;font-weight:600;color:#14213d;margin:14px 0 8px}
+.ligne{cursor:pointer}.ligne:hover td{background:#fff7e6}.actif td{background:#fdeccc!important}
+"""
+
+_INTERFACE = """<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent d'audit de conformité — démonstration</title><style>__CSS__</style></head><body>
+<header><div class="wrap"><h1>Agent d'audit de conformité</h1>
+<div class="sub">Démonstration sur __N__ contrats déjà analysés</div>
+<div class="meta">Modèle __MODELE__ · corpus de lois version __VERSION__ · généré le __DATE__</div></div></header>
+<div class="wrap">
+<div class="note"><b>Démonstration.</b> Ces contrats ont été analysés à l'avance ; aucun n'a servi à régler le système. Envoyer un nouveau
+contrat depuis cette page est la prochaine étape (API). Aucun verdict « conforme / non conforme » n'est rendu : voir le README, Phase 5.</div>
+<h2>Choisir un contrat</h2>
+<div class="barre"><select id="choix"></select><button id="prec">◀ Précédent</button><button id="suiv">Suivant ▶</button></div>
+<details open><summary>Vue d'ensemble des contrats (cliquer sur une ligne pour ouvrir son rapport)</summary><table id="vue"></table></details>
+<div id="rapport"></div>
+</div>
+<script>
+const DATA = __PAYLOAD__;
+const sel = document.getElementById('choix'), box = document.getElementById('rapport'), vue = document.getElementById('vue');
+const cell = (tr, t) => { const td = document.createElement('td'); td.textContent = t; tr.appendChild(td); return td; };
+const th = vue.insertRow();
+['Contrat', 'Paragraphes', 'Clauses retrouvées', 'Présentes', 'Manquantes', 'À vérifier'].forEach(t => { const h = document.createElement('th'); h.textContent = t; th.appendChild(h); });
+DATA.forEach((d, i) => {
+  const o = document.createElement('option'); o.value = i; o.textContent = d.titre.slice(0, 95) + ' (' + d.paragraphes + ' paragraphes)'; sel.appendChild(o);
+  const tr = vue.insertRow(); tr.className = 'ligne'; tr.dataset.i = i;
+  cell(tr, d.titre.slice(0, 80)); cell(tr, d.paragraphes); cell(tr, d.clauses); cell(tr, d.presente); cell(tr, d.manquante); cell(tr, d.a_verifier);
+  tr.addEventListener('click', () => show(i, true));
+});
+function show(i, scroll) {
+  i = Math.max(0, Math.min(DATA.length - 1, i));
+  box.innerHTML = DATA[i].html; sel.value = i;
+  document.querySelectorAll('.ligne').forEach(r => r.classList.toggle('actif', Number(r.dataset.i) === i));
+  history.replaceState(null, '', '#' + i);
+  if (scroll) box.scrollIntoView({behavior: 'smooth'});
+}
+sel.addEventListener('change', () => show(Number(sel.value)));
+document.getElementById('prec').addEventListener('click', () => show(Number(sel.value) - 1, true));
+document.getElementById('suiv').addEventListener('click', () => show(Number(sel.value) + 1, true));
+show(Number(location.hash.slice(1)) || 0);
+</script></body></html>"""
+
+
+def render_interface(items: list[dict], meta: dict) -> str:
+    """items : [{"titre": ..., "analyse": ...}]. Une page autonome : liste déroulante, vue d'ensemble, rapport du contrat choisi."""
+    data = []
+    for it in items:
+        a = it["analyse"]
+        c = statut_counts(a)
+        data.append({"titre": it["titre"], "paragraphes": a["stats"]["segments"], "clauses": a["stats"]["clauses"],
+                     "presente": c["presente"], "manquante": c["manquante"], "a_verifier": c["a_verifier"], "html": render_body(a)})
+    payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+    return (_INTERFACE.replace("__CSS__", _CSS + _CSS_INTERFACE).replace("__N__", str(len(items)))
+            .replace("__MODELE__", _e(meta["modele"])).replace("__VERSION__", _e(meta["version_corpus"]))
+            .replace("__DATE__", _e(meta["date"])).replace("__PAYLOAD__", payload))
