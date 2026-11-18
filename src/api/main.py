@@ -5,12 +5,20 @@ Lancement :
 Documentation interactive : http://localhost:8000/docs
 """
 
+import json
+import shutil
+import tempfile
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 from uuid import uuid4
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+
+ROOT = Path(__file__).resolve().parents[2]
+FEEDBACK_FILE = ROOT / "data" / "feedback" / "corrections.jsonl"
 
 app = FastAPI(
     title="Agent d'audit de conformite documentaire",
@@ -20,6 +28,7 @@ app = FastAPI(
 
 # Stockage en memoire, a remplacer par une base lors de l'etape de deploiement.
 JOBS: dict[str, dict] = {}
+REPORTS: dict[str, str] = {}      # job_id -> page HTML du rapport
 
 
 class Verdict(str, Enum):
@@ -27,6 +36,7 @@ class Verdict(str, Enum):
     non_conforme = "non_conforme"
     a_verifier = "a_verifier"
     manquante = "manquante"
+    presente = "presente"         # clause attendue trouvee (aucun verdict de conformite automatique)
 
 
 class ClauseFinding(BaseModel):
@@ -43,6 +53,7 @@ class AuditReport(BaseModel):
     status: str
     created_at: datetime
     document: str | None = None
+    erreur: str | None = None
     findings: list[ClauseFinding] = []
 
 
@@ -58,13 +69,49 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+def _findings(result: dict) -> list[dict]:
+    """Clauses attendues du rapport -> format ClauseFinding de l'API."""
+    out = []
+    for a in result["attendues"]:
+        preuve = a["preuve"] or {}
+        out.append({
+            "clause_ref": None,
+            "clause_type": a["categorie"],
+            "verdict": a["statut"],
+            "article": None,
+            "justification": a["regle"] if a["statut"] != "presente" else preuve.get("texte", "")[:300],
+            "confidence": preuve.get("confiance") or (1.0 if a["statut"] == "presente" else 0.0),
+        })
+    return out
+
+
+def _run_audit(job_id: str, path: Path, title: str) -> None:
+    """Tache de fond : execute la chaine d'audit et range le resultat."""
+    from src.pipeline import audit_file      # import ici : l'API demarre sans charger le modele
+
+    JOBS[job_id]["status"] = "en_cours"
+    try:
+        result, html = audit_file(path, title)
+        REPORTS[job_id] = html
+        JOBS[job_id]["findings"] = _findings(result)
+        JOBS[job_id]["status"] = "termine"
+    except Exception as exc:  # noqa: BLE001
+        JOBS[job_id]["status"] = "erreur"
+        JOBS[job_id]["erreur"] = str(exc)
+    finally:
+        shutil.rmtree(path.parent, ignore_errors=True)
+
+
 @app.post("/audit", response_model=AuditReport, status_code=202)
-async def submit_audit(file: UploadFile = File(...)) -> AuditReport:
+async def submit_audit(background: BackgroundTasks, file: UploadFile = File(...)) -> AuditReport:
     """Soumet un document a l'audit. Retourne un identifiant de tache."""
-    if not file.filename.lower().endswith((".pdf", ".docx")):
-        raise HTTPException(400, "Formats acceptes : .pdf, .docx")
+    if not file.filename.lower().endswith((".pdf", ".docx", ".txt")):
+        raise HTTPException(400, "Formats acceptes : .pdf, .docx, .txt")
 
     job_id = str(uuid4())
+    tmp = Path(tempfile.mkdtemp()) / Path(file.filename).name
+    tmp.write_bytes(await file.read())
+
     report = AuditReport(
         job_id=job_id,
         status="en_attente",
@@ -72,7 +119,7 @@ async def submit_audit(file: UploadFile = File(...)) -> AuditReport:
         document=file.filename,
     )
     JOBS[job_id] = report.model_dump()
-    # TODO : declencher le pipeline d'audit en tache de fond
+    background.add_task(_run_audit, job_id, tmp, Path(file.filename).stem)
     return report
 
 
@@ -84,10 +131,23 @@ def get_audit(job_id: str) -> AuditReport:
     return AuditReport(**JOBS[job_id])
 
 
+@app.get("/audit/{job_id}/rapport", response_class=HTMLResponse)
+def get_report_html(job_id: str) -> str:
+    """Page HTML du rapport, une fois l'audit termine."""
+    if job_id not in JOBS:
+        raise HTTPException(404, "Tache inconnue")
+    if job_id not in REPORTS:
+        raise HTTPException(409, f"Rapport pas encore pret (statut : {JOBS[job_id]['status']})")
+    return REPORTS[job_id]
+
+
 @app.post("/feedback", status_code=201)
 def submit_feedback(feedback: Feedback) -> dict:
     """Enregistre la correction d'un juriste. Alimente le reentrainement."""
     if feedback.job_id not in JOBS:
         raise HTTPException(404, "Tache inconnue")
-    # TODO : persister la correction dans le jeu de donnees de reentrainement
+    FEEDBACK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    line = feedback.model_dump() | {"date": datetime.now(timezone.utc).isoformat()}
+    with FEEDBACK_FILE.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(line, ensure_ascii=False) + "\n")
     return {"status": "enregistre", "clause_ref": feedback.clause_ref}
