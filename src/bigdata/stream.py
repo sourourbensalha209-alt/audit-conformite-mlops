@@ -65,9 +65,42 @@ def process_message(value: bytes, audit_fn: Callable, modele: str, lake_dir: Pat
     return event
 
 
+def ensure_topics(bootstrap: str = BOOTSTRAP, partitions: int = 3, attente_max_s: float = 90) -> None:
+    """Crée les sujets s'ils n'existent pas, en attendant que Kafka soit prêt (utile au démarrage de docker compose).
+
+    Sans cela, un worker lancé avant le premier envoi attendrait jusqu'à 5 minutes de voir apparaître le sujet.
+    """
+    import time
+
+    from confluent_kafka import KafkaException
+    from confluent_kafka.admin import AdminClient, NewTopic
+
+    admin = AdminClient({"bootstrap.servers": bootstrap})
+    fin = time.time() + attente_max_s
+    while True:
+        try:
+            existants = set(admin.list_topics(timeout=5).topics)
+            break
+        except KafkaException as exc:
+            if time.time() > fin:
+                raise
+            print(f"Kafka pas encore prêt ({exc}), nouvel essai...")
+            time.sleep(3)
+    nouveaux = [NewTopic(t, num_partitions=partitions, replication_factor=1)
+                for t in (TOPIC_IN, TOPIC_OUT, TOPIC_ERR) if t not in existants]
+    for topic, future in admin.create_topics(nouveaux).items() if nouveaux else []:
+        try:
+            future.result(30)
+            print(f"Sujet créé : {topic}")
+        except KafkaException as exc:          # créé entre-temps par un autre worker : sans gravité
+            if "TOPIC_ALREADY_EXISTS" not in str(exc):
+                raise
+
+
 def produce(paths: list[Path], bootstrap: str = BOOTSTRAP) -> int:
     from confluent_kafka import Producer
 
+    ensure_topics(bootstrap)
     producer = Producer({"bootstrap.servers": bootstrap, "acks": "all"})
     n = 0
     for p in paths:
@@ -88,6 +121,7 @@ def work(bootstrap: str = BOOTSTRAP, max_messages: int | None = None, idle_timeo
     from src.orchestration.registry import production_model_name
     modele = production_model_name()
 
+    ensure_topics(bootstrap)
     consumer = Consumer({"bootstrap.servers": bootstrap, "group.id": GROUP, "auto.offset.reset": "earliest",
                          "enable.auto.commit": False})
     producer = Producer({"bootstrap.servers": bootstrap})

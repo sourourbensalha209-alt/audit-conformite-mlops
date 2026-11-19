@@ -47,9 +47,12 @@ services:
     restart: unless-stopped
 
   worker:
-    image: audit-conformite:latest              # même image que l'API
+    build: .
+    image: audit-conformite:latest              # même image que l'API (construite une fois, réutilisée)
     profiles: ["bigdata"]
     command: python -m src.bigdata.stream travailler
+    healthcheck:
+      disable: true                             # pas de serveur web dans un worker
     environment:
       KAFKA_BOOTSTRAP: kafka:29092
     volumes:
@@ -57,7 +60,6 @@ services:
       - ./data/lake:/app/data/lake
     depends_on:
       - kafka
-      - api                                     # l'image est construite par le service api
     deploy:
       replicas: 2                               # 2 workers du groupe « auditeurs » se partagent les contrats
     restart: unless-stopped

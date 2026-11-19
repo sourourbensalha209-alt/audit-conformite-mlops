@@ -16,6 +16,7 @@ venv/
 /data/feedback
 /data/monitoring
 /data/lake
+/data/demo_contrats
 
 # MLflow
 mlruns/
