@@ -2,6 +2,7 @@
 python-dotenv==1.0.1
 pyyaml==6.0.2
 pandas==2.2.3
+openpyxl==3.1.5          # feuille d'annotation du juge (src/judge/sheet.py)
 numpy==1.26.4
 scikit-learn==1.5.2
 tqdm==4.67.1
@@ -42,3 +43,4 @@ evidently==0.4.40
 
 # --- Tests ---
 pytest==8.3.3
+httpx==0.27.2            # client de test de FastAPI (tests/test_api.py)

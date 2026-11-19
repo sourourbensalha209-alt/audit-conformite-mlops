@@ -1,7 +1,81 @@
+# Lancement :   docker compose up --build                     -> API + interface (8000) et MLflow (5000)
+# Big Data   :   docker compose --profile bigdata up --build   -> en plus : Kafka et 2 workers d'audit
+#                docker compose run --rm spark                 -> job Spark bronze -> silver -> gold
+# Envoyer des contrats dans Kafka depuis le PC :  python -m src.bigdata.stream produire dossier_de_contrats/
+
 services:
+
+  api:
+    build: .
+    image: audit-conformite:latest
+    container_name: audit-api
+    ports:
+      - "8000:8000"
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./models:/app/models:ro                 # modèle Legal-BERT v4 (récupéré avec dvc pull), lecture seule
+      - ./data/feedback:/app/data/feedback      # corrections des juristes : gardées sur le disque, hors du conteneur
+      - ./data/monitoring:/app/data/monitoring  # journal du monitoring (un audit par ligne)
+      - ./data/lake:/app/data/lake              # data lake : chaque audit et correction en zone bronze
+    depends_on:
+      - mlflow
+    restart: unless-stopped
+
+  # ---------- Couche Big Data (profil « bigdata ») ----------
+
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: audit-kafka
+    profiles: ["bigdata"]
+    ports:
+      - "9092:9092"                             # accès depuis le PC (producteur)
+    environment:                                # un seul nœud, mode KRaft (sans ZooKeeper)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:29092,CONTROLLER://:29093,PLAINTEXT_HOST://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3                   # 3 partitions : jusqu'à 3 workers en parallèle
+    restart: unless-stopped
+
+  worker:
+    build: .
+    image: audit-conformite:latest              # même image que l'API (construite une fois, réutilisée)
+    profiles: ["bigdata"]
+    command: python -m src.bigdata.stream travailler
+    healthcheck:
+      disable: true                             # pas de serveur web dans un worker
+    environment:
+      KAFKA_BOOTSTRAP: kafka:29092
+    volumes:
+      - ./models:/app/models:ro
+      - ./data/lake:/app/data/lake
+    depends_on:
+      - kafka
+    deploy:
+      replicas: 2                               # 2 workers du groupe « auditeurs » se partagent les contrats
+    restart: unless-stopped
+
+  spark:
+    image: apache/spark:3.5.3-python3
+    profiles: ["spark"]                         # job ponctuel : lancé à la demande (docker compose run --rm spark)
+    user: root                                  # écrire dans le dossier monté data/lake
+    command: /opt/spark/bin/spark-submit --master local[*] /app/src/bigdata/spark_job.py --lake /app/data/lake
+    volumes:
+      - ./src:/app/src:ro
+      - ./data/lake:/app/data/lake
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.17.2
+    container_name: audit-mlflow
     command: >
       mlflow server
       --host 0.0.0.0
@@ -12,17 +86,7 @@ services:
       - "5000:5000"
     volumes:
       - mlflow_data:/mlflow
-
-  api:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      MLFLOW_TRACKING_URI: http://mlflow:5000
-    depends_on:
-      - mlflow
-    volumes:
-      - ./data:/app/data
+    restart: unless-stopped
 
 volumes:
   mlflow_data:

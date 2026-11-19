@@ -1,0 +1,4 @@
+# Couche Big Data : traitement distribué du data lake (src/bigdata/spark_job.py).
+# PySpark demande Java 17. Il n'est pas dans l'image du service (trop lourd) :
+# le job tourne dans l'image officielle apache/spark (docker compose --profile bigdata) ou dans la CI.
+pyspark==3.5.3

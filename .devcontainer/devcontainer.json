@@ -1,0 +1,26 @@
+{
+  // Environnement GitHub Codespaces pour la démonstration complète (Docker, Kafka, Spark).
+  // Ouvrir : sur GitHub, bouton « Code » -> onglet « Codespaces » -> « Create codespace on phase7-api ».
+  "name": "Agent d'audit — démonstration Big Data",
+  "build": { "dockerfile": "Dockerfile" },      // image Python 3.11, sans le dépôt Yarn cassé
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  // Minimum pour la démo (API + 2 workers avec le modèle, Kafka, MLflow, puis Spark) ; 4 cœurs si disponible.
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb"
+  },
+  "forwardPorts": [8000, 5000],
+  "portsAttributes": {
+    "8000": { "label": "Interface + API", "onAutoForward": "openBrowser" },
+    "5000": { "label": "MLflow" }
+  },
+  // Jeton DagsHub pour récupérer le modèle (dvc pull) : à enregistrer comme secret Codespaces, jamais dans le code.
+  "secrets": {
+    "DAGSHUB_TOKEN": {
+      "description": "Jeton DagsHub (https://dagshub.com/user/settings/tokens) pour télécharger le modèle avec DVC"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh"
+}
