@@ -1,10 +1,18 @@
 # Agent d'audit de conformité documentaire
 
-Système qui analyse un contrat et produit un rapport d'audit clause par clause :
-pour chaque clause, un verdict (conforme, non conforme, à vérifier, manquante),
-une justification et la citation de l'article de loi applicable.
+[![CI/CD](https://github.com/sourourbensalha209-alt/audit-conformite-mlops/actions/workflows/ci.yml/badge.svg)](https://github.com/sourourbensalha209-alt/audit-conformite-mlops/actions/workflows/ci.yml)
+[![Image Docker](https://img.shields.io/badge/image-ghcr.io-2496ED?logo=docker&logoColor=white)](https://github.com/sourourbensalha209-alt/audit-conformite-mlops/pkgs/container/audit-conformite-mlops)
+[![DVC](https://img.shields.io/badge/donn%C3%A9es%20et%20mod%C3%A8les-DVC%20%2B%20DagsHub-945DD6?logo=dvc&logoColor=white)](https://dagshub.com/sourourbensalha209-alt/audit-conformite-mlops)
+
+Système qui analyse un contrat (PDF, Word ou texte) et produit un rapport d'audit clause par clause : il
+reconnaît le type de chaque clause, signale les clauses attendues qui manquent, rattache chaque clause à sa
+règle de contrôle et, pour les données personnelles, aux articles du RGPD et de la loi tunisienne 2004-63.
+Il ne rend pas de verdict « conforme / non conforme » automatique (voir « Phase 5 ») : c'est un **assistant de
+tri** pour le juriste, qui relit, corrige, et dont les corrections servent à réentraîner le modèle.
 
 **Projet Big Data & Deep Learning — 5ème année Ingénierie Data Science & IA**
+
+![Architecture](docs/captures/architecture.png)
 
 ---
 
@@ -23,7 +31,7 @@ sont faciles à rater. Ce projet automatise cette vérification.
 Contrat PDF / DOCX
       |
       v
-[1] Extraction du texte (OCR si le document est scanné)                     à faire
+[1] Extraction du texte : PDF (pdfplumber, OCR si scanné), Word, texte    terminé
       |
       v
 [2] Découpage en clauses (src/data/segment.py)                              terminé
@@ -47,14 +55,14 @@ Contrat PDF / DOCX
 [6] Rapport d'audit (page HTML, scripts/audit_contract.py)                   fait
       |
       v
-[7] Lecture de PDF + API + interface web + monitoring                       à faire
+[7] API FastAPI + interface web + Docker + CI/CD + monitoring               terminé
       |
       v
-   Correction par un juriste --> réentraînement
-```
+   Correction par un juriste --> réentraînement (orchestrateur + promotion)   terminé
 
-Couche Big Data prévue : ingestion en flux (Kafka), traitement distribué (Spark),
-stockage en data lake.
+Couche Big Data : contrats en masse --> Kafka --> workers d'audit en parallèle
+                  --> data lake (bronze) --> Spark (silver, gold)              terminé
+```
 
 **Pourquoi deux composants à l'étape 3.** Quatre des 41 catégories CUAD (nom du contrat, parties,
 date de signature, date d'entrée en vigueur) ne sont pas des clauses mais de petits passages de
@@ -294,7 +302,81 @@ les contrôles RGPD à vérifier. Le rapport ne rend aucun verdict « conforme /
 que pour la responsabilité plafonnée et la loi applicable, où la mesure n'a donné aucune fausse alerte ; pour les autres catégories, il écrit
 « à vérifier ». Pour les 30 contrats de confirmation, le rapport sort instantanément à partir des calculs enregistrés.
 `python scripts/build_interface.py` rassemble ces 30 rapports dans une seule page (liste déroulante, vue d'ensemble, boutons précédent et suivant) :
-une interface de démonstration, sans serveur ni modèle. Envoyer un nouveau contrat depuis une page web est la prochaine étape (API).
+une interface de démonstration, sans serveur ni modèle.
+
+---
+
+## Produit : API et interface web
+
+`uvicorn src.api.main:app` puis http://localhost:8000 : on dépose un contrat (PDF, Word ou texte), l'audit tourne en
+tâche de fond et le résultat s'affiche (clauses attendues, clauses trouvées, identification, rapport complet).
+
+![Interface : résultat d'un audit](docs/captures/interface_resultat.png)
+*Capture de l'interface sur le contrat de démonstration `contrat_test_distribution.pdf` (données de démonstration).*
+
+- **Lecture des PDF** (`src/data/paragraphs.py`) : pdfplumber rend une ligne par ligne imprimée, sans ligne vide entre
+  paragraphes ; les paragraphes sont reconstruits (titres numérotés, majuscules, fin de phrase) avant le découpage.
+  Un renvoi du type « … conformément à / Section 8. » n'ouvre pas une nouvelle clause.
+- **Chaîne d'audit** (`src/pipeline.py`) : lecture → découpage → Legal-BERT → clauses manquantes → rapport, avec le modèle
+  chargé une seule fois.
+- **API** (`src/api/main.py`) : `POST /audit`, `GET /audit/{id}`, `GET /audit/{id}/rapport`, `POST /feedback`,
+  `GET /monitoring`, `GET /metrics`, `GET /reentrainement`, `GET /bigdata`. Documentation : http://localhost:8000/docs
+- **Interface** (`frontend/` : `index.html`, `app.css`, `app.js`) : JavaScript standard, mise en page Tabler (MIT, copiée
+  dans `frontend/vendor/` pour fonctionner hors connexion). Le juriste peut **corriger** chaque résultat.
+- **Contrôle RGPD sur tous les paragraphes** : CUAD n'a pas de catégorie « données personnelles », le classifieur range
+  donc ces clauses dans « Autre ». Le contrôle par mots-clés s'applique quand même ; l'interface indique la source
+  (« détectée par mots-clés RGPD ») et ces clauses ne sont pas comptées comme reconnues par le modèle.
+
+---
+
+## MLOps
+
+| Brique | Mise en œuvre |
+| --- | --- |
+| Versionnement | Git ; DVC pour les données et les modèles, stockage distant **DagsHub** (`dvc pull models/best_model_v4.dvc`) ; MLflow pour les expériences |
+| Conteneurisation | `Dockerfile` (Python 3.11, OCR, PyTorch CPU) ; le modèle n'est pas dans l'image, il est monté en lecture seule. `docker-compose.yml` : API + interface, MLflow ; profil `bigdata` : Kafka et 2 workers ; Spark à la demande |
+| CI/CD (GitHub Actions) | À chaque push : tests (pytest) → tests d'intégration Big Data (vrai Kafka, vrai Spark) → image Docker construite, **démarrée et vérifiée** (API + interface) → **publiée** sur GitHub Container Registry |
+| Monitoring (`src/monitoring.py`) | Chaque audit est tracé. Service : erreurs, durée. Modèle : confiance moyenne, part de paragraphes incertains, part « Autre ». **Dérive** : comparaison à la référence mesurée sur 30 contrats jamais vus (79,4 % « Autre », 1,8 % d'abstention), à partir de 5 audits. Format Prometheus sur `/metrics` |
+| Réentraînement (`src/orchestration/`) | Les corrections portant un passage et sa bonne catégorie deviennent des exemples étiquetés. L'orchestrateur décide de réentraîner à 20 nouveaux exemples, ou sur alerte du monitoring avec au moins 5 exemples, et prépare le paquet pour le notebook Colab (GPU) ; décisions tracées dans MLflow |
+| Promotion (champion / challenger) | `python -m src.orchestration.promote models/best_model_v5` : mis en service seulement si le F1 macro est meilleur, sans recul de plus d'un point sur les catégories rares, sur le **même** jeu de test et les mêmes étiquettes. `models/production.json` sert de registre |
+
+![Monitoring](docs/captures/interface_monitoring.png)
+*Page Monitoring (données de démonstration) : indicateurs, alertes, réentraînement, dérive, data lake.*
+
+Image publiée : `docker pull ghcr.io/sourourbensalha209-alt/audit-conformite-mlops:latest`
+
+---
+
+## Big Data : Kafka, Spark, data lake
+
+- **Data lake** (`src/bigdata/lake.py`, architecture médaillon) : chaque audit et chaque correction est versé dans la
+  zone **bronze** (un fichier JSON par événement, partitionné par jour, écriture atomique, sans le texte du contrat).
+- **Kafka** (`src/bigdata/stream.py`) : sujet `contrats` (3 partitions), workers du groupe `auditeurs` qui se partagent
+  les partitions, résultats dans `audits`, contrats illisibles dans `contrats.erreurs`. Un message n'est validé
+  qu'après son traitement (« au moins une fois »).
+- **Spark** (`src/bigdata/spark_job.py`) : bronze → **silver** (Parquet, typé, dédoublonné) → **gold** (clauses le plus
+  souvent manquantes, évolution par jour, clauses trouvées, corrections par catégorie).
+
+**Démonstration réelle** (GitHub Codespaces, `bash scripts/demo_bigdata.sh`) : 40 contrats synthétiques
+(`scripts/generer_contrats_demo.py`, banque de clauses écrite pour le projet, vérité terrain connue) envoyés dans
+Kafka, audités par 2 workers en parallèle (23 et 17 contrats, 97 s), puis agrégés par Spark.
+
+| Clause | Présente (vérité) | Résultat du système |
+| --- | --- | --- |
+| Limitation de responsabilité | 18 / 40 | 22 manquantes sur 40 : exact |
+| Droit applicable | 35 / 40 | 5 manquantes sur 40 : exact |
+| Durée / échéance, données personnelles, droit d'audit, assurance, cession, résiliation sans motif | 38, 19, 18, 26, 28, 25 | mêmes nombres retrouvés |
+| Renouvellement automatique | 22 / 40 | 22 retrouvées, mais classées « Notice Period To Terminate Renewal » (confiance 0,55) : confusion entre deux catégories voisines |
+
+Ces contrats synthétiques valident la **chaîne** Kafka → workers → data lake → Spark ; ils ne servent pas à évaluer le
+modèle, mesuré sur CUAD (sections précédentes).
+
+| Kafka : 2 workers | Spark : zone gold |
+| --- | --- |
+| ![Kafka](docs/captures/kafka_2_workers.png) | ![Spark](docs/captures/spark_zone_gold.png) |
+
+![Interface : data lake](docs/captures/interface_data_lake.png)
+![CI : tests Kafka + Spark](docs/captures/ci_bigdata_kafka_spark.png)
 
 ---
 
@@ -312,6 +394,12 @@ une interface de démonstration, sans serveur ni modèle. Envoyer un nouveau con
 - Le verdict « conforme / non conforme » n'est pas automatisé : les deux modèles ouverts testés ne distinguent pas les cas (voir « Phase 5 »).
 - Jeu de données modeste pour le deep learning (10 134 clauses, catégories rares sous 20 exemples) : compensé
   par un modèle pré-entraîné sur des textes juridiques et une perte pondérée.
+- Renouvellement automatique et préavis de non-renouvellement sont parfois confondus (vu aussi dans la démonstration Big Data).
+- Le service garde les tâches d'audit en mémoire (une seule instance) ; le journal du monitoring, les corrections et le
+  data lake sont, eux, écrits sur disque.
+- Un message Kafka est limité à 1 Mo : au-delà, déposer le contrat dans le data lake et n'envoyer que son chemin (« claim check »).
+- Le réentraînement lui-même tourne sur GPU (Colab) : l'orchestrateur prépare les données et la promotion décide, mais
+  l'entraînement n'est pas lancé automatiquement.
 
 ---
 
@@ -332,7 +420,11 @@ une interface de démonstration, sans serveur ni modèle. Envoyer un nouveau con
 - Interface de démonstration (liste de contrats, sans serveur) : `python scripts/build_interface.py`
 - Clauses manquantes : `python scripts/eval_missing.py --model models/best_model_v4`
 - Cas du juge : `python scripts/build_judge_cases.py` ; modèles : `notebooks/judge_colab.ipynb` ; mesure : `python scripts/eval_judge.py --sheet data/judge/annotations_sourour.csv data/judge/annotations_ghayth.csv`
-- Tests : `python -m pytest tests/test_law_watch.py tests/test_segment.py tests/test_autre.py tests/test_header.py tests/test_judge.py tests/test_report.py -q` (74 tests)
+- Service d'audit et interface : `dvc pull models/best_model_v4.dvc` puis `uvicorn src.api.main:app --reload` (http://localhost:8000)
+- Tout le service avec Docker : `docker compose up --build` ; avec la couche Big Data : `docker compose --profile bigdata up --build`
+- Démonstration Big Data complète (Codespaces) : `bash scripts/demo_bigdata.sh` ; job Spark seul : `docker compose run --rm spark`
+- Orchestrateur de réentraînement : `python -m src.orchestration.retrain` ; promotion : `python -m src.orchestration.promote models/best_model_v5`
+- Tests : `python -m pytest` (les tests Kafka et Spark tournent dans la CI, ignorés en local sans Kafka ni Java)
 
 ---
 
@@ -349,7 +441,15 @@ une interface de démonstration, sans serveur ni modèle. Envoyer un nouveau con
 | pdfplumber | Lecture des PDF de lois |
 | Google Colab (GPU T4) | Entraînement des Transformers, mesure des encodeurs |
 | scikit-learn | Baseline TF-IDF + SVM, métriques |
-| FastAPI, Docker | Service d'audit (à faire) |
+| FastAPI, Uvicorn | API du service d'audit, tâches en arrière-plan |
+| Tabler (MIT), JavaScript | Interface web (`frontend/`) |
+| Docker, Docker Compose | Conteneurisation ; image publiée sur GitHub Container Registry |
+| GitHub Actions | CI/CD : tests, intégration Kafka + Spark, construction, vérification et publication de l'image |
+| DagsHub | Stockage distant DVC du modèle |
+| Apache Kafka | Ingestion en flux des contrats, workers en parallèle |
+| Apache Spark (PySpark) | Traitement du data lake : bronze → silver → gold |
+| Prometheus (format) | Métriques du service et du modèle (`/metrics`) |
+| GitHub Codespaces | Démonstration complète (Docker, Kafka, Spark) sans installation locale |
 
 ---
 
@@ -370,7 +470,14 @@ python -m src.models.classify_baseline
 
 # Suivi des expériences
 mlflow ui --port 5000          # http://localhost:5000
+
+# Modèle (stockage DagsHub) puis service d'audit et interface
+dvc pull models/best_model_v4.dvc
+uvicorn src.api.main:app --reload   # http://localhost:8000
 ```
+
+Sans rien installer : bouton **Code → Codespaces → Create codespace** sur la branche du projet (secret `DAGSHUB_TOKEN`
+requis pour télécharger le modèle), puis `bash scripts/demo_bigdata.sh`.
 
 ---
 
@@ -391,9 +498,17 @@ mlflow ui --port 5000          # http://localhost:5000
 │   ├── data/        # découpage en clauses, extraction d'identité, exemples « Autre », mesures
 │   ├── models/      # classification des clauses (entraînement, inférence)
 │   ├── retrieval/   # corpus de lois, index, veille juridique, évaluation
-│   ├── judge/       # jugement de conformité
-│   └── api/         # service FastAPI
-├── tests/
+│   ├── judge/       # jugement de conformité, rapport d'audit
+│   ├── api/         # service FastAPI
+│   ├── bigdata/     # data lake, ingestion Kafka, job Spark
+│   ├── orchestration/  # réentraînement, promotion, registre du modèle en production
+│   ├── monitoring.py   # suivi du service et du modèle, dérive, Prometheus
+│   └── pipeline.py     # chaîne d'audit complète
+├── frontend/        # interface web (HTML, CSS, JavaScript ; Tabler dans vendor/)
+├── tests/           # tests unitaires ; tests/integration : Kafka et Spark (CI)
+├── .github/workflows/  # CI/CD
+├── .devcontainer/   # configuration GitHub Codespaces
+├── Dockerfile, docker-compose.yml
 ├── docs/            # fiche projet, diagrammes, captures
 ├── dvc.yaml         # pipeline de données reproductible
 └── params.yaml      # hyperparamètres
@@ -411,10 +526,10 @@ mlflow ui --port 5000          # http://localhost:5000
 | 3. Référentiel et corpus de lois | 41 règles sourcées sur CUAD, RGPD (99 articles), loi 2004-63 (105 articles) | Terminé |
 | 4. Recherche et veille juridique | BGE-M3 (Recall@5 0,787), mise à jour automatique des lois, dépôt de PDF du JORT | Terminé |
 | 5. Jugement | Clauses manquantes : critère atteint. Verdict conforme / non conforme par un modèle ouvert : évalué, critères non atteints, non retenu (assistant de tri) | Évalué |
-| 6. Big Data | Kafka, Spark, data lake | À faire |
-| 7. Produit | Rapport d'audit en page HTML : fait. Lecture de PDF, API, interface web, Docker : à faire | En cours |
-| 8. MLOps avancé | Orchestration, CI/CD, monitoring | À faire |
-| 9. Soutenance | Démo, rapport final | À faire |
+| 6. Big Data | Data lake bronze / silver / gold, ingestion Kafka (workers en parallèle), job Spark ; testé en CI et démontré dans Codespaces | Terminé |
+| 7. Produit | Lecture des PDF, API FastAPI, interface web (Tabler), rapport HTML, Docker, image publiée | Terminé |
+| 8. MLOps avancé | CI/CD GitHub Actions, monitoring et dérive, boucle de réentraînement, promotion champion / challenger, stockage DVC sur DagsHub | Terminé |
+| 9. Soutenance | Démo, rapport final | En préparation |
 
 ---
 
