@@ -1,4 +1,4 @@
-.PHONY: install data pipeline api mlflow test lint clean docker docker-stop retrain promote
+.PHONY: install data pipeline api mlflow test lint clean docker docker-stop retrain promote bigdata spark
 
 install:
 	pip install -r requirements.txt
@@ -32,3 +32,9 @@ retrain:
 
 promote:
 	python -m src.orchestration.promote $(MODELE)
+
+bigdata:
+	docker compose --profile bigdata up --build -d
+
+spark:
+	docker compose --profile bigdata run --rm spark

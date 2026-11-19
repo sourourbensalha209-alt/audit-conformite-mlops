@@ -18,3 +18,6 @@ fastapi==0.115.5
 uvicorn[standard]==0.32.1
 pydantic==2.10.2
 python-multipart==0.0.17
+
+# Ingestion en flux (worker Kafka : même image que l'API)
+confluent-kafka==2.6.1

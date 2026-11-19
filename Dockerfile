@@ -34,7 +34,7 @@ COPY data/rules/ ./data/rules/
 COPY data/corpus/ ./data/corpus/
 
 # 3) Utilisateur sans droits d'administration
-RUN useradd --create-home audit && mkdir -p data/feedback data/monitoring models && chown -R audit:audit /app
+RUN useradd --create-home audit && mkdir -p data/feedback data/monitoring data/lake models && chown -R audit:audit /app
 USER audit
 
 EXPOSE 8000

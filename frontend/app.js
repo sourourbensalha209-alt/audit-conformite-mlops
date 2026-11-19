@@ -6,6 +6,7 @@
 //   POST /feedback          correction d'un juriste
 //   GET  /monitoring        indicateurs du service et du modèle, alertes de dérive
 //   GET  /categories        catégories du modèle en production
+//   GET  /bigdata           volume du data lake (bronze) et agrégats calculés par Spark (gold)
 //   GET  /reentrainement    exemples des juristes, dernière décision · POST /reentrainement/verifier : lance l'orchestrateur
 // Aucune bibliothèque externe : JavaScript standard.
 
@@ -346,7 +347,7 @@ async function loadMonitoring() {
     const n = m.alertes.length;
     $("nav-alerts").textContent = n;
     $("nav-alerts").hidden = n === 0;
-    if (!$("view-monitoring").hidden) { renderMonitoring(m); loadReentrainement(); }
+    if (!$("view-monitoring").hidden) { renderMonitoring(m); loadReentrainement(); loadLake(); }
   } catch (_) { /* service injoignable : déjà signalé dans le menu */ }
 }
 
@@ -425,6 +426,25 @@ async function sendFeedback() {
   } catch (err) {
     toast(`Échec de l'enregistrement : ${err.message}`);
   }
+}
+
+// ---------- Data lake ----------
+
+async function loadLake() {
+  try {
+    const b = await api("/bigdata");
+    $("lake-audits").textContent = `${b.bronze.audits} audits`;
+    $("lake-corrections").textContent = `${b.bronze.corrections} corrections de juristes · un fichier JSON par événement, partitionné par jour`;
+    const g = b.gold;
+    $("lake-gold").innerHTML = !g
+      ? `<div class="subheader">Zone gold (agrégats Spark)</div>
+         <div class="text-secondary small">Le job Spark n'a pas encore tourné sur ce poste. Il est exécuté et vérifié par la CI
+         (job « Big Data »), ou avec : <code>docker compose --profile bigdata run --rm spark</code></div>`
+      : `<div class="subheader">Zone gold : clauses le plus souvent manquantes (${g.audits} audits, ${g.contrats_distincts} contrats)</div>
+         <table class="table table-sm mb-0"><thead><tr><th>Catégorie</th><th>Manquante</th><th>Taux</th></tr></thead><tbody>
+         ${g.par_categorie.slice(0, 5).map((r) => `<tr><td>${esc(r.categorie)}</td><td>${r.manquante} / ${r.contrats}</td>
+           <td>${pct(r.taux_manquante)}</td></tr>`).join("")}</tbody></table>`;
+  } catch (_) { /* service injoignable */ }
 }
 
 // ---------- Réentraînement ----------

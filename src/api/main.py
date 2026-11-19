@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src import monitoring
+from src.bigdata import lake
 from src.orchestration import retrain
 from src.orchestration.registry import production_model_dir
 
@@ -104,6 +105,14 @@ def _findings(result: dict) -> list[dict]:
     return out
 
 
+def _to_lake(kind: str, build) -> None:
+    """Verse un événement dans le data lake (zone bronze). Une panne du lake ne doit jamais faire échouer l'audit."""
+    try:
+        lake.write_bronze(kind, build())
+    except Exception as exc:  # noqa: BLE001
+        print(f"Data lake indisponible ({kind}) : {exc}")
+
+
 def _run_audit(job_id: str, path: Path, title: str) -> None:
     """Tache de fond : execute la chaine d'audit et range le resultat."""
     from src.pipeline import audit_file      # import ici : l'API demarre sans charger le modele
@@ -121,6 +130,8 @@ def _run_audit(job_id: str, path: Path, title: str) -> None:
         JOBS[job_id]["duree_s"] = duree
         JOBS[job_id]["status"] = "termine"
         monitoring.record({**trace, "statut": "termine", "duree_s": duree, **result.get("monitoring", {})})
+        _to_lake("audits", lambda: lake.audit_event(job_id, JOBS[job_id]["document"], result, duree,
+                                                    production_model_dir().name, source="api"))
     except Exception as exc:  # noqa: BLE001
         JOBS[job_id]["status"] = "erreur"
         JOBS[job_id]["erreur"] = str(exc)
@@ -209,6 +220,15 @@ def download_paquet() -> FileResponse:
     return FileResponse(retrain.WORK_DIR / etat["paquet"], filename=etat["paquet"])
 
 
+@app.get("/bigdata")
+def get_bigdata() -> dict:
+    """Agrégats calculés par Spark sur le data lake (zone gold), et volume de la zone bronze."""
+    bronze = lake.LAKE / "bronze"
+    compte = {k: sum(1 for _ in (bronze / k).rglob("*.json")) if (bronze / k).exists() else 0
+              for k in ("audits", "corrections")}
+    return {"bronze": compte, "gold": lake.read_gold()}
+
+
 @app.post("/feedback", status_code=201)
 def submit_feedback(feedback: Feedback) -> dict:
     """Enregistre la correction d'un juriste. Alimente le reentrainement."""
@@ -218,6 +238,7 @@ def submit_feedback(feedback: Feedback) -> dict:
     line = feedback.model_dump(mode="json") | {"date": datetime.now(timezone.utc).isoformat()}
     with FEEDBACK_FILE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(line, ensure_ascii=False) + "\n")
+    _to_lake("corrections", lambda: lake.correction_event(line))
     return {"status": "enregistre", "clause_ref": feedback.clause_ref}
 
 

@@ -15,6 +15,7 @@ venv/
 # Corrections des juristes (donnees produites par l'application)
 /data/feedback
 /data/monitoring
+/data/lake
 
 # MLflow
 mlruns/

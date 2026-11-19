@@ -26,6 +26,7 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setattr(api.monitoring, "LOG_FILE", tmp_path / "audits.jsonl")
     monkeypatch.setattr(api.retrain, "WORK_DIR", tmp_path / "reentrainement")
     monkeypatch.setattr(api.retrain, "_log_mlflow", lambda *a: None)
+    monkeypatch.setattr(api.lake, "LAKE", tmp_path / "lake")
     api.JOBS.clear()
     api.REPORTS.clear()
     return TestClient(api.app)
@@ -90,3 +91,10 @@ def test_correction_avec_passage_puis_reentrainement(client):
     d = client.post("/reentrainement/verifier?force=true").json()
     assert d["reentrainer"] is True and d["paquet"] == "reentrainement_colab.zip"
     assert client.get("/reentrainement/paquet").status_code == 200
+
+
+def test_audit_et_correction_verses_dans_le_data_lake(client, tmp_path):
+    job_id = client.post("/audit", files={"file": ("c.txt", b"texte")}).json()["job_id"]
+    client.post("/feedback", json={"job_id": job_id, "clause_ref": "Cap On Liability", "verdict_corrige": "presente"})
+    assert client.get("/bigdata").json()["bronze"] == {"audits": 1, "corrections": 1}
+    assert list((tmp_path / "lake" / "bronze" / "audits").glob(f"jour=*/{job_id}.json"))

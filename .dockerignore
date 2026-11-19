@@ -22,6 +22,7 @@ data/judge
 data/corpus_raw
 data/feedback
 data/monitoring
+data/lake
 *.pdf
 *.zip
 .env
