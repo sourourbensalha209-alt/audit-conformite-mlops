@@ -1,0 +1,4 @@
+[core]
+    remote = origin
+['remote "origin"']
+    url = https://dagshub.com/sourourbensalha209-alt/audit-conformite-mlops.dvc
