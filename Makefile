@@ -37,4 +37,4 @@ bigdata:
 	docker compose --profile bigdata up --build -d
 
 spark:
-	docker compose --profile bigdata run --rm spark
+	docker compose run --rm spark

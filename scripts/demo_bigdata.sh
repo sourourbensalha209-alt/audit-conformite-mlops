@@ -19,7 +19,7 @@ if [ ! -f models/best_model_v4/model.safetensors ]; then
   echo "Modèle absent (models/best_model_v4). Lancer d'abord : bash .devcontainer/post-create.sh"
   exit 1
 fi
-mkdir -p data/lake data/feedback data/monitoring
+mkdir -p data/lake/bronze/audits data/feedback data/monitoring
 
 echo "== 1/5  Démarrage : API, MLflow, Kafka et 2 workers (la première fois : quelques minutes) =="
 docker compose --profile bigdata up --build -d
@@ -27,7 +27,7 @@ echo -n "Attente de l'API "
 until curl -fs http://localhost:8000/health > /dev/null; do echo -n "."; sleep 3; done
 echo " prête."
 
-AVANT=$(find data/lake/bronze/audits -name '*.json' 2>/dev/null | wc -l)
+AVANT=$(find data/lake/bronze/audits -name '*.json' 2>/dev/null | wc -l || true)
 
 echo "== 2/5  Génération de $N contrats synthétiques et envoi dans Kafka (sujet « contrats ») =="
 rm -rf data/demo_contrats && python scripts/generer_contrats_demo.py --n "$N" --out data/demo_contrats
@@ -37,7 +37,7 @@ echo "== 3/5  Les 2 workers auditent les contrats en parallèle =="
 CIBLE=$((AVANT + N))
 DEBUT=$(date +%s)
 while true; do
-  FAIT=$(find data/lake/bronze/audits -name '*.json' 2>/dev/null | wc -l)
+  FAIT=$(find data/lake/bronze/audits -name '*.json' 2>/dev/null | wc -l || true)
   printf "\r   %d / %d contrats audités (%d s)" "$((FAIT - AVANT))" "$N" "$(( $(date +%s) - DEBUT ))"
   [ "$FAIT" -ge "$CIBLE" ] && break
   [ $(( $(date +%s) - DEBUT )) -gt 900 ] && { echo; echo "Délai dépassé : voir  docker compose logs worker"; break; }
@@ -48,7 +48,7 @@ echo "   Répartition entre les workers :"
 docker compose --profile bigdata logs --no-color worker 2>/dev/null | grep -o '^[^|]*| Audité' | sort | uniq -c || true
 
 echo "== 4/5  Job Spark : bronze -> silver -> gold =="
-docker compose --profile bigdata run --rm spark
+docker compose run --rm spark
 
 echo "== 5/5  Résultat (zone gold) =="
 python - <<'PY'

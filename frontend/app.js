@@ -439,7 +439,7 @@ async function loadLake() {
     $("lake-gold").innerHTML = !g
       ? `<div class="subheader">Zone gold (agrégats Spark)</div>
          <div class="text-secondary small">Le job Spark n'a pas encore tourné sur ce poste. Il est exécuté et vérifié par la CI
-         (job « Big Data »), ou avec : <code>docker compose --profile bigdata run --rm spark</code></div>`
+         (job « Big Data »), ou avec : <code>docker compose run --rm spark</code></div>`
       : `<div class="subheader">Zone gold : clauses le plus souvent manquantes (${g.audits} audits, ${g.contrats_distincts} contrats)</div>
          <table class="table table-sm mb-0"><thead><tr><th>Catégorie</th><th>Manquante</th><th>Taux</th></tr></thead><tbody>
          ${g.par_categorie.slice(0, 5).map((r) => `<tr><td>${esc(r.categorie)}</td><td>${r.manquante} / ${r.contrats}</td>

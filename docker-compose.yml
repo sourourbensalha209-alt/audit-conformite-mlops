@@ -1,6 +1,6 @@
 # Lancement :   docker compose up --build                     -> API + interface (8000) et MLflow (5000)
 # Big Data   :   docker compose --profile bigdata up --build   -> en plus : Kafka et 2 workers d'audit
-#                docker compose --profile bigdata run --rm spark   -> job Spark bronze -> silver -> gold
+#                docker compose run --rm spark                 -> job Spark bronze -> silver -> gold
 # Envoyer des contrats dans Kafka depuis le PC :  python -m src.bigdata.stream produire dossier_de_contrats/
 
 services:
@@ -66,7 +66,7 @@ services:
 
   spark:
     image: apache/spark:3.5.3-python3
-    profiles: ["bigdata"]
+    profiles: ["spark"]                         # job ponctuel : lancé à la demande (docker compose run --rm spark)
     user: root                                  # écrire dans le dossier monté data/lake
     command: /opt/spark/bin/spark-submit --master local[*] /app/src/bigdata/spark_job.py --lake /app/data/lake
     volumes:
